@@ -168,7 +168,7 @@ export default function Home({ onTakeQuiz, onCheckRank, onAdmin }: Props) {
             {settings.show_motivational_banner && (settings.motivational_banner_url || settings.motivational_quote) && (
               <div className="mt-6 overflow-hidden rounded-2xl border border-white/10" style={{ backgroundColor: 'var(--site-background)' }}>
                 {settings.motivational_banner_url && (
-                  <img src={settings.motivational_banner_url} alt="Motivational banner" className="max-h-40 w-full object-cover" />
+                  <img src={settings.motivational_banner_url} alt="Motivational banner" className="max-h-64 w-full object-contain" />
                 )}
                 {settings.motivational_quote && (
                   <p className="px-4 py-3 text-center text-sm font-semibold italic text-white">{settings.motivational_quote}</p>
