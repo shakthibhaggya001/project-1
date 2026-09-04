@@ -81,3 +81,16 @@ export type Student = {
 };
 
 export type QuizStatus = 'upcoming' | 'open' | 'closed';
+
+export type SiteSettings = {
+  id: number;
+  portal_title: string;
+  subtitle: string;
+  description: string;
+  contact_numbers: string;
+  poster_url: string;
+  primary_color: string;
+  background_color: string;
+  card_color: string;
+  updated_at: string;
+};

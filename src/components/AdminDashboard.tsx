@@ -28,6 +28,7 @@ import {
 
 type Props = {
   onCreateQuiz: () => void;
+  onSiteSettings: () => void;
   onEditPaper: (quiz: Quiz) => void;
   onSignOut: () => void;
 };
@@ -43,7 +44,7 @@ type Top10Student = {
   photo_url: string;
 };
 
-export default function AdminDashboard({ onCreateQuiz, onEditPaper, onSignOut }: Props) {
+export default function AdminDashboard({ onCreateQuiz, onSiteSettings, onEditPaper, onSignOut }: Props) {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
@@ -1067,6 +1068,12 @@ export default function AdminDashboard({ onCreateQuiz, onEditPaper, onSignOut }:
             <span className="font-bold text-slate-900">Quiz Admin</span>
           </div>
           <div className="ml-auto flex items-center gap-3">
+            <button
+              onClick={onSiteSettings}
+              className="flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm transition"
+            >
+              <Pencil className="w-4 h-4" /> Site Settings
+            </button>
             <button
               onClick={onCreateQuiz}
               className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm px-4 py-2 rounded-xl transition"

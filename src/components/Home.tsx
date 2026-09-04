@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowRight,
   Brain,
@@ -11,6 +11,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
+import { supabase, type SiteSettings } from '@/lib/supabase';
 
 type Props = {
   onTakeQuiz: () => void;
@@ -25,8 +26,26 @@ const navItems = [
   { label: 'Admin', action: 'admin' },
 ] as const;
 
+const defaultSettings: Omit<SiteSettings, 'id' | 'updated_at'> = {
+  portal_title: 'Test your knowledge. Claim your rank.',
+  subtitle: 'Online Examination Portal',
+  description: '40 questions. 40 minutes. Take the timed exam and check your results as soon as they are published.',
+  contact_numbers: '',
+  poster_url: '/ChatGPT_Image_Sep_3,_2026,_08_13_21_AM.png',
+  primary_color: '#1c4f9d',
+  background_color: '#171918',
+  card_color: '#2b312c',
+};
+
 export default function Home({ onTakeQuiz, onCheckRank, onAdmin }: Props) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [settings, setSettings] = useState(defaultSettings);
+
+  useEffect(() => {
+    supabase.from('site_settings').select('*').eq('id', 1).maybeSingle().then(({ data }) => {
+      if (data) setSettings({ ...defaultSettings, ...(data as SiteSettings) });
+    });
+  }, []);
 
   const handleNavAction = (action: string) => {
     setMobileMenuOpen(false);
@@ -47,7 +66,7 @@ export default function Home({ onTakeQuiz, onCheckRank, onAdmin }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen text-white" style={{ backgroundColor: settings.background_color, ['--site-primary' as string]: settings.primary_color, ['--site-card' as string]: settings.card_color }}>
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/90 backdrop-blur-md">
         <div className="responsive-shell flex items-center justify-between py-3">
           <div className="flex items-center gap-3">
@@ -55,7 +74,7 @@ export default function Home({ onTakeQuiz, onCheckRank, onAdmin }: Props) {
               <Brain className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-lime-300">AM Class</p>
+              <p className="text-sm font-black uppercase tracking-[0.2em]" style={{ color: settings.primary_color }}>{settings.subtitle}</p>
               <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-slate-400">Exam Portal</p>
             </div>
           </div>
@@ -115,32 +134,31 @@ export default function Home({ onTakeQuiz, onCheckRank, onAdmin }: Props) {
         <section className="hero-grid">
           <aside className="order-1 mt-0 md:order-2 md:mt-0">
             <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 p-2 shadow-2xl shadow-slate-950/30">
-              <img
-                src="/ChatGPT_Image_Sep_3,_2026,_08_13_21_AM.png"
-                alt="History AM Class poster"
+              <img src={settings.poster_url || defaultSettings.poster_url} alt="Site poster"
                 className="poster-image"
               />
             </div>
           </aside>
 
-          <div className="order-2 rounded-[2rem] border border-white/10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-5 shadow-2xl shadow-slate-950/40 sm:p-6 md:order-1 md:p-8">
-            <div className="mb-4 inline-flex items-center rounded-full border border-lime-300/40 bg-lime-300/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.24em] text-lime-300">
-              Online Examination Portal
+          <div className="order-2 rounded-[2rem] border border-white/10 p-5 shadow-2xl shadow-slate-950/40 sm:p-6 md:order-1 md:p-8" style={{ backgroundColor: settings.card_color }}>
+            <div className="mb-4 inline-flex items-center rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.24em]" style={{ borderColor: `${settings.primary_color}66`, color: settings.primary_color }}>
+              {settings.subtitle}
             </div>
 
             <h1 className="max-w-lg text-3xl font-black leading-tight text-white sm:text-4xl md:text-5xl">
-              Test your knowledge. Claim your rank.
+              {settings.portal_title}
             </h1>
 
             <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-300 md:text-lg">
-              40 questions. 40 minutes. Take the timed exam and check your results as soon as they are published.
+              {settings.description}
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row md:flex-col xl:flex-row">
               <button
                 type="button"
                 onClick={onTakeQuiz}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-500"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-semibold text-white shadow-lg transition hover:brightness-110"
+                style={{ backgroundColor: settings.primary_color }}
               >
                 <ClipboardList className="h-4 w-4" />
                 Take Exam
@@ -157,25 +175,26 @@ export default function Home({ onTakeQuiz, onCheckRank, onAdmin }: Props) {
             </div>
 
             <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <StatPill label="40" sublabel="Questions" />
-              <StatPill label="40" sublabel="Minutes" />
-              <StatPill label="1" sublabel="Rank Check" />
+              <StatPill label="40" sublabel="Questions" color={settings.primary_color} cardColor={settings.card_color} />
+              <StatPill label="40" sublabel="Minutes" color={settings.primary_color} cardColor={settings.card_color} />
+              <StatPill label="1" sublabel="Rank Check" color={settings.primary_color} cardColor={settings.card_color} />
             </div>
+            {settings.contact_numbers && <p className="mt-5 text-sm text-slate-300">Contact: {settings.contact_numbers}</p>}
           </div>
         </section>
 
         <section className="feature-grid mt-6 md:mt-8">
-          <FeatureCard
+          <FeatureCard cardColor={settings.card_color}
             icon={Timer}
             title="Timed Exam"
             description="A server-controlled timer keeps every attempt fair and consistent."
           />
-          <FeatureCard
+          <FeatureCard cardColor={settings.card_color}
             icon={CheckCircle2}
             title="Submit & Wait"
             description="Submit your work and view your score after publication time."
           />
-          <FeatureCard
+          <FeatureCard cardColor={settings.card_color}
             icon={Trophy}
             title="Check Your Rank"
             description="Measure your score, percentage, and leaderboard position instantly."
@@ -186,10 +205,10 @@ export default function Home({ onTakeQuiz, onCheckRank, onAdmin }: Props) {
   );
 }
 
-function StatPill({ label, sublabel }: { label: string; sublabel: string }) {
+function StatPill({ label, sublabel, color, cardColor }: { label: string; sublabel: string; color: string; cardColor: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-center">
-      <p className="text-xl font-black text-lime-300">{label}</p>
+    <div className="rounded-2xl border border-white/10 px-3 py-3 text-center" style={{ backgroundColor: cardColor }}>
+      <p className="text-xl font-black" style={{ color }}>{label}</p>
       <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">{sublabel}</p>
     </div>
   );
@@ -199,13 +218,15 @@ function FeatureCard({
   icon: Icon,
   title,
   description,
+  cardColor,
 }: {
   icon: LucideIcon;
   title: string;
   description: string;
+  cardColor: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-slate-950/10 md:p-5">
+    <div className="rounded-2xl border border-white/10 p-4 shadow-lg shadow-slate-950/10 md:p-5" style={{ backgroundColor: cardColor }}>
       <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600/15 text-lime-300">
         <Icon className="h-5 w-5" />
       </div>

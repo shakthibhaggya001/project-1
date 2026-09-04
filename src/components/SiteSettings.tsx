@@ -1,0 +1,97 @@
+import { ChangeEvent, useEffect, useState } from 'react';
+import { ArrowLeft, Image as ImageIcon, Loader2, Save } from 'lucide-react';
+import { supabase, type SiteSettings } from '@/lib/supabase';
+
+type Props = { onBack: () => void };
+
+const defaults = {
+  portal_title: 'Test your knowledge. Claim your rank.',
+  subtitle: 'Online Examination Portal',
+  description: '40 questions. 40 minutes. Take the timed exam and check your results as soon as they are published.',
+  contact_numbers: '',
+  poster_url: '/ChatGPT_Image_Sep_3,_2026,_08_13_21_AM.png',
+  primary_color: '#1c4f9d',
+  background_color: '#171918',
+  card_color: '#2b312c',
+};
+
+export default function SiteSettings({ onBack }: Props) {
+  const [form, setForm] = useState(defaults);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    supabase.from('site_settings').select('*').eq('id', 1).maybeSingle().then(({ data }) => {
+      if (data) setForm({ ...defaults, ...(data as SiteSettings) });
+      setLoading(false);
+    });
+  }, []);
+
+  const update = (field: keyof typeof form, value: string) => setForm((current) => ({ ...current, [field]: value }));
+
+  const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => update('poster_url', String(reader.result));
+    reader.readAsDataURL(file);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setMessage('');
+    const { error } = await supabase.from('site_settings').upsert({ id: 1, ...form }, { onConflict: 'id' });
+    setSaving(false);
+    setMessage(error ? error.message : 'Settings saved. The customer view will use them immediately.');
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-4">
+          <button onClick={onBack} className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"><ArrowLeft className="w-4 h-4" /> Dashboard</button>
+          <h1 className="text-xl font-bold text-slate-900">Site Settings</h1>
+          <button onClick={save} disabled={saving} className="ml-auto flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold px-4 py-2 rounded-xl"><Save className="w-4 h-4" /> {saving ? 'Saving...' : 'Save Settings'}</button>
+        </div>
+      </header>
+      <main className="max-w-5xl mx-auto px-4 py-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="space-y-6">
+          <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+            <h2 className="text-lg font-bold text-slate-900">Content & Text</h2>
+            <Field label="Portal Title" value={form.portal_title} onChange={(value) => update('portal_title', value)} />
+            <Field label="Subtitle" value={form.subtitle} onChange={(value) => update('subtitle', value)} />
+            <Field label="Description" value={form.description} onChange={(value) => update('description', value)} area />
+            <Field label="Contact Numbers" value={form.contact_numbers} onChange={(value) => update('contact_numbers', value)} placeholder="e.g. 077 123 4567" />
+          </section>
+          <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+            <h2 className="text-lg font-bold text-slate-900">Poster</h2>
+            <Field label="Image URL" value={form.poster_url.startsWith('data:') ? '' : form.poster_url} onChange={(value) => update('poster_url', value)} placeholder="https://..." />
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700"><ImageIcon className="w-4 h-4" /> Or upload an image<input type="file" accept="image/*" onChange={handleFile} className="text-sm" /></label>
+          </section>
+          <section className="bg-white border border-slate-200 rounded-2xl p-5">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">Theme Colors</h2>
+            <div className="grid gap-4 sm:grid-cols-3"><ColorField label="Primary Accent" value={form.primary_color} onChange={(value) => update('primary_color', value)} /><ColorField label="Background" value={form.background_color} onChange={(value) => update('background_color', value)} /><ColorField label="Card Color" value={form.card_color} onChange={(value) => update('card_color', value)} /></div>
+          </section>
+          {message && <p className="text-sm text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-3">{message}</p>}
+        </div>
+        <aside className="lg:sticky lg:top-6 h-fit rounded-2xl p-3 text-white" style={{ backgroundColor: form.background_color }}>
+          <p className="text-xs uppercase tracking-widest opacity-70 px-2 py-2">Live Preview</p>
+          <img src={form.poster_url || defaults.poster_url} alt="Poster preview" className="w-full aspect-[4/5] object-cover rounded-xl" />
+          <div className="mt-3 rounded-xl p-4" style={{ backgroundColor: form.card_color }}><p className="text-xs uppercase tracking-widest" style={{ color: form.primary_color }}>{form.subtitle}</p><h3 className="text-xl font-bold mt-2">{form.portal_title}</h3><p className="text-sm mt-2 opacity-75">{form.description}</p></div>
+        </aside>
+      </main>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, area, placeholder }: { label: string; value: string; onChange: (value: string) => void; area?: boolean; placeholder?: string }) {
+  const className = "w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 outline-none focus:border-blue-500";
+  return <label className="block text-sm font-medium text-slate-700">{label}{area ? <textarea rows={4} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} className={`${className} mt-1.5`} /> : <input value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} className={`${className} mt-1.5`} />}</label>;
+}
+
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <label className="block text-sm font-medium text-slate-700">{label}<div className="mt-1.5 flex items-center gap-2"><input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-12 cursor-pointer rounded-lg border-0 p-0" /><input value={value} onChange={(event) => onChange(event.target.value)} className="min-w-0 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></div></label>;
+}

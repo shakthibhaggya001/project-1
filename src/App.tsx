@@ -6,10 +6,11 @@ import AdminDashboard from '@/components/AdminDashboard';
 import PaperEditor from '@/components/PaperEditor';
 import StudentQuiz from '@/components/StudentQuiz';
 import CheckRank from '@/components/CheckRank';
+import SiteSettings from '@/components/SiteSettings';
 import { Loader2 } from 'lucide-react';
 import type { Quiz } from '@/lib/supabase';
 
-type Route = 'home' | 'take-quiz' | 'check-rank' | 'admin' | 'create-quiz' | 'edit-paper';
+type Route = 'home' | 'take-quiz' | 'check-rank' | 'admin' | 'create-quiz' | 'edit-paper' | 'site-settings';
 
 function AppContent() {
   const { session, loading, signOut } = useAuth();
@@ -25,7 +26,7 @@ function AppContent() {
   }
 
   // Admin routes require auth
-  if (route === 'admin' || route === 'create-quiz' || route === 'edit-paper') {
+  if (route === 'admin' || route === 'create-quiz' || route === 'edit-paper' || route === 'site-settings') {
     if (!session) {
       return <AdminLogin />;
     }
@@ -35,9 +36,13 @@ function AppContent() {
     if (route === 'edit-paper' && editingQuiz) {
       return <PaperEditor quiz={editingQuiz} mode="edit" onBack={() => setRoute('admin')} onSaved={() => setRoute('admin')} />;
     }
+    if (route === 'site-settings') {
+      return <SiteSettings onBack={() => setRoute('admin')} />;
+    }
     return (
       <AdminDashboard
         onCreateQuiz={() => setRoute('create-quiz')}
+        onSiteSettings={() => setRoute('site-settings')}
         onEditPaper={(quiz: Quiz) => {
           setEditingQuiz(quiz);
           setRoute('edit-paper');
