@@ -7,6 +7,7 @@ import PaperEditor from '@/components/PaperEditor';
 import StudentQuiz from '@/components/StudentQuiz';
 import CheckRank from '@/components/CheckRank';
 import SiteSettings from '@/components/SiteSettings';
+import { SiteSettingsProvider } from '@/lib/siteSettings';
 import { Loader2 } from 'lucide-react';
 import type { Quiz } from '@/lib/supabase';
 
@@ -75,7 +76,9 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <SiteSettingsProvider>
+        <AppContent />
+      </SiteSettingsProvider>
     </AuthProvider>
   );
 }

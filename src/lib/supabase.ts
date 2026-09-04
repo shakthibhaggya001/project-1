@@ -92,6 +92,9 @@ export type SiteSettings = {
   primary_color: string;
   background_color: string;
   card_color: string;
+  motivational_banner_url: string;
+  motivational_quote: string;
+  show_motivational_banner: boolean;
   updated_at: string;
 };
 
@@ -104,6 +107,9 @@ export const defaultSiteSettings: Omit<SiteSettings, 'id' | 'updated_at'> = {
   primary_color: '#1c4f9d',
   background_color: '#171918',
   card_color: '#2b312c',
+  motivational_banner_url: '',
+  motivational_quote: '',
+  show_motivational_banner: true,
 };
 
 const siteSettingsStorageKey = 'am-class-site-settings';

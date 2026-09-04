@@ -8,8 +8,15 @@ CREATE TABLE IF NOT EXISTS site_settings (
   primary_color text NOT NULL DEFAULT '#1c4f9d',
   background_color text NOT NULL DEFAULT '#171918',
   card_color text NOT NULL DEFAULT '#2b312c',
+  motivational_banner_url text NOT NULL DEFAULT '',
+  motivational_quote text NOT NULL DEFAULT '',
+  show_motivational_banner boolean NOT NULL DEFAULT true,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS motivational_banner_url text NOT NULL DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS motivational_quote text NOT NULL DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS show_motivational_banner boolean NOT NULL DEFAULT true;
 
 INSERT INTO site_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
