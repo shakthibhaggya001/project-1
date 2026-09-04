@@ -127,13 +127,21 @@ export async function loadSiteSettings() {
 
 export async function saveSiteSettings(settings: Omit<SiteSettings, 'id' | 'updated_at'>) {
   const validationError = validateSiteSettings(settings);
-  if (validationError) return new Error(validationError);
+  if (validationError) return { settings: null, error: new Error(validationError) };
 
   try {
-    const { error } = await supabase.from('site_settings').upsert({ id: 1, ...settings }, { onConflict: 'id' });
-    return error;
+    const { data, error } = await supabase
+      .from('site_settings')
+      .upsert({ id: 1, ...settings }, { onConflict: 'id' })
+      .select('*')
+      .single();
+
+    if (error) return { settings: null, error };
+    if (!data) return { settings: null, error: new Error('The settings were not returned after saving.') };
+
+    return { settings: { ...defaultSiteSettings, ...(data as SiteSettings) }, error: null };
   } catch (error) {
-    return error instanceof Error ? error : new Error('Unable to save site settings.');
+    return { settings: null, error: error instanceof Error ? error : new Error('Unable to save site settings.') };
   }
 }
 

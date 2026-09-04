@@ -33,9 +33,9 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const saveSettings = async (nextSettings: EditableSiteSettings) => {
-    const error = await persistSiteSettings(nextSettings);
-    if (!error) setSettings(nextSettings);
-    return error?.message ?? null;
+    const result = await persistSiteSettings(nextSettings);
+    if (result.settings) setSettings(result.settings);
+    return result.error?.message ?? null;
   };
 
   return (
