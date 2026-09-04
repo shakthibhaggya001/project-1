@@ -55,7 +55,7 @@ export default function AdminLogin() {
 
         <form
           onSubmit={handleSubmit}
-          className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-2xl p-6 space-y-5"
+          className="interactive-card bg-slate-800/50 backdrop-blur border border-slate-700 rounded-2xl p-6 space-y-5"
         >
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">Admin Access Code</label>

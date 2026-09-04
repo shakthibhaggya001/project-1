@@ -208,9 +208,30 @@ textarea::placeholder { color: #8a9685; }
 button,
 input,
 textarea,
-select { transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease; }
+select { transition: all 300ms ease-in-out; }
+
+.interactive-card,
+.bg-white.rounded-2xl { transition: all 300ms ease-in-out; }
+
+button:hover:not(:disabled),
+.interactive-card:hover,
+.bg-white.rounded-2xl:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 24px rgba(23, 25, 24, 0.14);
+}
 
 button:active:not(:disabled) { transform: translateY(1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  input,
+  textarea,
+  select,
+  .interactive-card,
+  .bg-white.rounded-2xl {
+    transition-duration: 0.01ms;
+  }
+}
 
 .brand-pulse { animation: brand-pulse 2.4s ease-in-out infinite; }
 

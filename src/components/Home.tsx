@@ -124,7 +124,7 @@ export default function Home({ onTakeQuiz, onCheckRank, onAdmin }: Props) {
             </div>
           </aside>
 
-          <div className="order-2 rounded-[2rem] border border-white/10 p-5 shadow-2xl shadow-slate-950/40 sm:p-6 md:order-1 md:p-8" style={{ backgroundColor: 'var(--site-card)' }}>
+          <div className="interactive-card order-2 rounded-[2rem] border border-white/10 p-5 shadow-2xl shadow-slate-950/40 sm:p-6 md:order-1 md:p-8" style={{ backgroundColor: 'var(--site-card)' }}>
             <div className="mb-4 inline-flex items-center rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.24em]" style={{ borderColor: `${settings.primary_color}66`, color: 'var(--site-primary)' }}>
               {settings.subtitle}
             </div>
@@ -219,7 +219,7 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 p-4 shadow-lg shadow-slate-950/10 md:p-5" style={{ backgroundColor: 'var(--site-card)' }}>
+    <div className="interactive-card rounded-2xl border border-white/10 p-4 shadow-lg shadow-slate-950/10 md:p-5" style={{ backgroundColor: 'var(--site-card)' }}>
       <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600/15 text-lime-300">
         <Icon className="h-5 w-5" />
       </div>
