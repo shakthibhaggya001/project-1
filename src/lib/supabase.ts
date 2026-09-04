@@ -94,3 +94,68 @@ export type SiteSettings = {
   card_color: string;
   updated_at: string;
 };
+
+export const defaultSiteSettings: Omit<SiteSettings, 'id' | 'updated_at'> = {
+  portal_title: 'Test your knowledge. Claim your rank.',
+  subtitle: 'Online Examination Portal',
+  description: '40 questions. 40 minutes. Take the timed exam and check your results as soon as they are published.',
+  contact_numbers: '',
+  poster_url: '/ChatGPT_Image_Sep_3,_2026,_08_13_21_AM.png',
+  primary_color: '#1c4f9d',
+  background_color: '#171918',
+  card_color: '#2b312c',
+};
+
+const siteSettingsStorageKey = 'am-class-site-settings';
+const siteSettingsPendingKey = 'am-class-site-settings-pending';
+
+export function getLocalSiteSettings(): Omit<SiteSettings, 'id' | 'updated_at'> | null {
+  try {
+    const stored = localStorage.getItem(siteSettingsStorageKey);
+    return stored ? { ...defaultSiteSettings, ...JSON.parse(stored) } : null;
+  } catch {
+    return null;
+  }
+}
+
+export function storeLocalSiteSettings(settings: Omit<SiteSettings, 'id' | 'updated_at'>) {
+  try {
+    localStorage.setItem(siteSettingsStorageKey, JSON.stringify(settings));
+    localStorage.setItem(siteSettingsPendingKey, 'true');
+  } catch {
+    // Database persistence remains available if browser storage is full or disabled.
+  }
+}
+
+export async function loadSiteSettings() {
+  const localSettings = getLocalSiteSettings();
+  let hasPendingLocalSettings = false;
+  try {
+    hasPendingLocalSettings = localStorage.getItem(siteSettingsPendingKey) === 'true';
+  } catch {
+    hasPendingLocalSettings = false;
+  }
+  if (localSettings && hasPendingLocalSettings) {
+    return { settings: localSettings, error: null };
+  }
+  const { data, error } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
+  if (data && !error) {
+    const settings = { ...defaultSiteSettings, ...(data as SiteSettings) };
+    return { settings, error: null };
+  }
+  return { settings: localSettings ?? defaultSiteSettings, error };
+}
+
+export async function saveSiteSettings(settings: Omit<SiteSettings, 'id' | 'updated_at'>) {
+  storeLocalSiteSettings(settings);
+  const { error } = await supabase.from('site_settings').upsert({ id: 1, ...settings }, { onConflict: 'id' });
+  if (!error) {
+    try {
+      localStorage.removeItem(siteSettingsStorageKey);
+      localStorage.removeItem(siteSettingsPendingKey);
+    } catch {
+      // The database is authoritative after a successful save.
+    }
+  }
+  return error;
+}

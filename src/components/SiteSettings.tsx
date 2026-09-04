@@ -1,29 +1,18 @@
 import { ChangeEvent, useEffect, useState } from 'react';
 import { ArrowLeft, Image as ImageIcon, Loader2, Save } from 'lucide-react';
-import { supabase, type SiteSettings } from '@/lib/supabase';
+import { defaultSiteSettings, loadSiteSettings, saveSiteSettings } from '@/lib/supabase';
 
 type Props = { onBack: () => void };
 
-const defaults = {
-  portal_title: 'Test your knowledge. Claim your rank.',
-  subtitle: 'Online Examination Portal',
-  description: '40 questions. 40 minutes. Take the timed exam and check your results as soon as they are published.',
-  contact_numbers: '',
-  poster_url: '/ChatGPT_Image_Sep_3,_2026,_08_13_21_AM.png',
-  primary_color: '#1c4f9d',
-  background_color: '#171918',
-  card_color: '#2b312c',
-};
-
 export default function SiteSettings({ onBack }: Props) {
-  const [form, setForm] = useState(defaults);
+  const [form, setForm] = useState(defaultSiteSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    supabase.from('site_settings').select('*').eq('id', 1).maybeSingle().then(({ data }) => {
-      if (data) setForm({ ...defaults, ...(data as SiteSettings) });
+    loadSiteSettings().then(({ settings }) => {
+      setForm(settings);
       setLoading(false);
     });
   }, []);
@@ -41,9 +30,9 @@ export default function SiteSettings({ onBack }: Props) {
   const save = async () => {
     setSaving(true);
     setMessage('');
-    const { error } = await supabase.from('site_settings').upsert({ id: 1, ...form }, { onConflict: 'id' });
+    const error = await saveSiteSettings(form);
     setSaving(false);
-    setMessage(error ? error.message : 'Settings saved. The customer view will use them immediately.');
+    setMessage(error ? `Saved locally. Database sync failed: ${error.message}` : 'Settings saved. The customer view will use them immediately.');
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
@@ -79,7 +68,7 @@ export default function SiteSettings({ onBack }: Props) {
         </div>
         <aside className="lg:sticky lg:top-6 h-fit rounded-2xl p-3 text-white" style={{ backgroundColor: form.background_color }}>
           <p className="text-xs uppercase tracking-widest opacity-70 px-2 py-2">Live Preview</p>
-          <img src={form.poster_url || defaults.poster_url} alt="Poster preview" className="w-full aspect-[4/5] object-cover rounded-xl" />
+          <img src={form.poster_url || defaultSiteSettings.poster_url} alt="Poster preview" className="w-full aspect-[4/5] object-cover rounded-xl" />
           <div className="mt-3 rounded-xl p-4" style={{ backgroundColor: form.card_color }}><p className="text-xs uppercase tracking-widest" style={{ color: form.primary_color }}>{form.subtitle}</p><h3 className="text-xl font-bold mt-2">{form.portal_title}</h3><p className="text-sm mt-2 opacity-75">{form.description}</p></div>
         </aside>
       </main>

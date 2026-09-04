@@ -11,7 +11,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { supabase, type SiteSettings } from '@/lib/supabase';
+import { defaultSiteSettings, loadSiteSettings } from '@/lib/supabase';
 
 type Props = {
   onTakeQuiz: () => void;
@@ -26,25 +26,12 @@ const navItems = [
   { label: 'Admin', action: 'admin' },
 ] as const;
 
-const defaultSettings: Omit<SiteSettings, 'id' | 'updated_at'> = {
-  portal_title: 'Test your knowledge. Claim your rank.',
-  subtitle: 'Online Examination Portal',
-  description: '40 questions. 40 minutes. Take the timed exam and check your results as soon as they are published.',
-  contact_numbers: '',
-  poster_url: '/ChatGPT_Image_Sep_3,_2026,_08_13_21_AM.png',
-  primary_color: '#1c4f9d',
-  background_color: '#171918',
-  card_color: '#2b312c',
-};
-
 export default function Home({ onTakeQuiz, onCheckRank, onAdmin }: Props) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [settings, setSettings] = useState(defaultSettings);
+  const [settings, setSettings] = useState(defaultSiteSettings);
 
   useEffect(() => {
-    supabase.from('site_settings').select('*').eq('id', 1).maybeSingle().then(({ data }) => {
-      if (data) setSettings({ ...defaultSettings, ...(data as SiteSettings) });
-    });
+    loadSiteSettings().then(({ settings: loadedSettings }) => setSettings(loadedSettings));
   }, []);
 
   const handleNavAction = (action: string) => {
@@ -134,7 +121,7 @@ export default function Home({ onTakeQuiz, onCheckRank, onAdmin }: Props) {
         <section className="hero-grid">
           <aside className="order-1 mt-0 md:order-2 md:mt-0">
             <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 p-2 shadow-2xl shadow-slate-950/30">
-              <img src={settings.poster_url || defaultSettings.poster_url} alt="Site poster"
+              <img src={settings.poster_url || defaultSiteSettings.poster_url} alt="Site poster"
                 className="poster-image"
               />
             </div>
