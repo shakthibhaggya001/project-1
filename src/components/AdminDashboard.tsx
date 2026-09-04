@@ -47,6 +47,7 @@ type Top10Student = {
 export default function AdminDashboard({ onCreateQuiz, onSiteSettings, onEditPaper, onSignOut }: Props) {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [subCount, setSubCount] = useState(0);
@@ -74,12 +75,15 @@ export default function AdminDashboard({ onCreateQuiz, onSiteSettings, onEditPap
   const [questionCounts, setQuestionCounts] = useState<Record<string, number>>({});
 
   const fetchQuizzes = useCallback(async () => {
+    setLoadError(null);
     const { data, error } = await supabase
       .from('quizzes')
       .select('*')
       .order('created_at', { ascending: false });
     if (error) {
       console.error(error);
+      setLoadError(error.message);
+      setLoading(false);
       return;
     }
     setQuizzes((data as Quiz[]) || []);
@@ -408,6 +412,24 @@ export default function AdminDashboard({ onCreateQuiz, onSiteSettings, onEditPap
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-lg rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
+          <AlertTriangle className="mx-auto h-8 w-8 text-red-500" />
+          <h1 className="mt-3 text-lg font-bold text-slate-900">Unable to load quizzes</h1>
+          <p className="mt-2 text-sm text-slate-600">{loadError}</p>
+          <button
+            onClick={fetchQuizzes}
+            className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+          >
+            Try again
+          </button>
+        </div>
       </div>
     );
   }
