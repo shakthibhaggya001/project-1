@@ -7,7 +7,7 @@ import PaperEditor from '@/components/PaperEditor';
 import StudentQuiz from '@/components/StudentQuiz';
 import CheckRank from '@/components/CheckRank';
 import SiteSettings from '@/components/SiteSettings';
-import { SiteSettingsProvider } from '@/lib/siteSettings';
+import { SiteSettingsProvider, useSiteSettings } from '@/lib/siteSettings';
 import { Loader2 } from 'lucide-react';
 import type { Quiz } from '@/lib/supabase';
 
@@ -15,10 +15,11 @@ type Route = 'home' | 'take-quiz' | 'check-rank' | 'admin' | 'create-quiz' | 'ed
 
 function AppContent() {
   const { session, loading, signOut } = useAuth();
+  const { loading: settingsLoading } = useSiteSettings();
   const [route, setRoute] = useState<Route>('home');
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
 
-  if (loading) {
+  if (loading || settingsLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />

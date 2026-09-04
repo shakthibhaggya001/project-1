@@ -112,56 +112,41 @@ export const defaultSiteSettings: Omit<SiteSettings, 'id' | 'updated_at'> = {
   show_motivational_banner: true,
 };
 
-const siteSettingsStorageKey = 'am-class-site-settings';
-const siteSettingsPendingKey = 'am-class-site-settings-pending';
-
-export function getLocalSiteSettings(): Omit<SiteSettings, 'id' | 'updated_at'> | null {
-  try {
-    const stored = localStorage.getItem(siteSettingsStorageKey);
-    return stored ? { ...defaultSiteSettings, ...JSON.parse(stored) } : null;
-  } catch {
-    return null;
-  }
-}
-
-export function storeLocalSiteSettings(settings: Omit<SiteSettings, 'id' | 'updated_at'>) {
-  try {
-    localStorage.setItem(siteSettingsStorageKey, JSON.stringify(settings));
-    localStorage.setItem(siteSettingsPendingKey, 'true');
-  } catch {
-    // Database persistence remains available if browser storage is full or disabled.
-  }
-}
-
 export async function loadSiteSettings() {
-  const localSettings = getLocalSiteSettings();
-  let hasPendingLocalSettings = false;
   try {
-    hasPendingLocalSettings = localStorage.getItem(siteSettingsPendingKey) === 'true';
-  } catch {
-    hasPendingLocalSettings = false;
+    const { data, error } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
+    if (data && !error) {
+      const settings = { ...defaultSiteSettings, ...(data as SiteSettings) };
+      return { settings, error: null };
+    }
+    return { settings: defaultSiteSettings, error };
+  } catch (error) {
+    return { settings: defaultSiteSettings, error: error instanceof Error ? error : new Error('Unable to load site settings.') };
   }
-  if (localSettings && hasPendingLocalSettings) {
-    return { settings: localSettings, error: null };
-  }
-  const { data, error } = await supabase.from('site_settings').select('*').eq('id', 1).maybeSingle();
-  if (data && !error) {
-    const settings = { ...defaultSiteSettings, ...(data as SiteSettings) };
-    return { settings, error: null };
-  }
-  return { settings: localSettings ?? defaultSiteSettings, error };
 }
 
 export async function saveSiteSettings(settings: Omit<SiteSettings, 'id' | 'updated_at'>) {
-  storeLocalSiteSettings(settings);
-  const { error } = await supabase.from('site_settings').upsert({ id: 1, ...settings }, { onConflict: 'id' });
-  if (!error) {
-    try {
-      localStorage.removeItem(siteSettingsStorageKey);
-      localStorage.removeItem(siteSettingsPendingKey);
-    } catch {
-      // The database is authoritative after a successful save.
-    }
+  const validationError = validateSiteSettings(settings);
+  if (validationError) return new Error(validationError);
+
+  try {
+    const { error } = await supabase.from('site_settings').upsert({ id: 1, ...settings }, { onConflict: 'id' });
+    return error;
+  } catch (error) {
+    return error instanceof Error ? error : new Error('Unable to save site settings.');
   }
-  return error;
+}
+
+function validateSiteSettings(settings: Omit<SiteSettings, 'id' | 'updated_at'>): string | null {
+  const requiredTextFields = ['portal_title', 'subtitle', 'description'] as const;
+  for (const field of requiredTextFields) {
+    if (!settings[field].trim()) return `${field.replace('_', ' ')} is required.`;
+  }
+
+  const colorFields = ['primary_color', 'background_color', 'card_color'] as const;
+  for (const field of colorFields) {
+    if (!/^#[0-9a-f]{6}$/i.test(settings[field])) return `${field.replace('_', ' ')} must be a six-digit hex color.`;
+  }
+
+  return null;
 }

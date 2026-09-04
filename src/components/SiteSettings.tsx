@@ -39,7 +39,7 @@ export default function SiteSettings({ onBack }: Props) {
     setMessage('');
     const error = await saveSettings(form);
     setSaving(false);
-    setMessage(error ? `Saved locally. Database sync failed: ${error}` : 'Settings saved. The customer view will use them immediately.');
+    setMessage(error ? `Settings were not saved: ${error}` : 'Settings saved. The customer view will use them immediately.');
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;

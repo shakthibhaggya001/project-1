@@ -21,15 +21,20 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     loadSiteSettings().then(({ settings: loadedSettings }) => {
+      if (!active) return;
       setSettings(loadedSettings);
       setLoading(false);
     });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const saveSettings = async (nextSettings: EditableSiteSettings) => {
-    setSettings(nextSettings);
     const error = await persistSiteSettings(nextSettings);
+    if (!error) setSettings(nextSettings);
     return error?.message ?? null;
   };
 
