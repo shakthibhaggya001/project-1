@@ -28,5 +28,15 @@ CREATE POLICY "admin_insert_site_settings" ON site_settings FOR INSERT TO authen
 DROP POLICY IF EXISTS "admin_update_site_settings" ON site_settings;
 CREATE POLICY "admin_update_site_settings" ON site_settings FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
 DROP TRIGGER IF EXISTS site_settings_updated_at ON site_settings;
 CREATE TRIGGER site_settings_updated_at BEFORE UPDATE ON site_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
