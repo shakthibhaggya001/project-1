@@ -249,7 +249,12 @@ export default function AdminDashboard({ onCreateQuiz, onSiteSettings, onEditPap
         await fetchSubmissions(selectedQuiz.id);
       }
     } catch (err) {
-      setActionResult(`Error: ${err instanceof Error ? err.message : 'Failed to publish results'}`);
+      const message = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+        ? String((err as { message?: unknown }).message)
+        : 'Failed to publish results';
+      setActionResult(`Error: ${message}`);
     } finally {
       setPublishing(false);
     }

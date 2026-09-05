@@ -16,7 +16,6 @@ import {
   Timer,
   ArrowRight,
   PlayCircle,
-  RotateCcw,
 } from 'lucide-react';
 
 const QUIZ_DURATION = 40 * 60; // 40 minutes in seconds

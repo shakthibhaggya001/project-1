@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase, type Quiz, type Question } from '@/lib/supabase';
-import { getQuizStatus, formatDate, formatTimeOfDay, toLocalDateTimeInput } from '@/lib/utils';
+import { getQuizStatus, toLocalDateTimeInput } from '@/lib/utils';
 import {
   ArrowLeft,
   Plus,
@@ -12,9 +12,7 @@ import {
   Eye,
   AlertTriangle,
   Brain,
-  Clock,
   FileCheck,
-  X,
 } from 'lucide-react';
 
 type QuestionDraft = {
@@ -108,12 +106,12 @@ const parseBulkQuestionText = (raw: string): QuestionDraft[] => {
     .map((block) => block.trim())
     .filter(Boolean);
 
-  const blocks = rawBlocks.length > 1 ? rawBlocks : cleaned.split(/\n(?=(?:\s*(?:Q(?:uestion)?\s*)?\d+|\s*[A-D][\.)]))/i);
+  const blocks = rawBlocks.length > 1 ? rawBlocks : cleaned.split(/\n(?=(?:\s*(?:Q(?:uestion)?\s*)?\d+|\s*[A-D][.)]))/i);
 
   const parsedQuestions: QuestionDraft[] = [];
 
   const flushQuestion = (questionText: string, optionMap: Partial<Record<AnswerOption, string>>) => {
-    const cleanedText = questionText.replace(/^(?:Q(?:uestion)?\s*)?\d+[\.)]\s*/i, '').trim();
+    const cleanedText = questionText.replace(/^(?:Q(?:uestion)?\s*)?\d+[.)]\s*/i, '').trim();
     const normalizedText = cleanedText.replace(/\s+/g, ' ');
     const options = { A: optionMap.A || '', B: optionMap.B || '', C: optionMap.C || '', D: optionMap.D || '' };
     const hasValidOptions = Object.values(options).every((value) => value.trim().length > 0);
@@ -142,15 +140,15 @@ const parseBulkQuestionText = (raw: string): QuestionDraft[] => {
     let questionText = '';
 
     lines.forEach((line) => {
-      const labeledOptionMatch = line.match(/^([A-D])\s*[\.)]\s*(.+)$/i);
+      const labeledOptionMatch = line.match(/^([A-D])\s*[.)]\s*(.+)$/i);
       if (labeledOptionMatch) {
         const letter = labeledOptionMatch[1].toUpperCase() as AnswerOption;
         optionMap[letter] = labeledOptionMatch[2].trim();
         return;
       }
 
-      const plainQuestionMatch = line.match(/^(?:Q(?:uestion)?\s*)?(?:\d+[\.)]|[A-D][\.)])?\s*(.+)$/i);
-      if (plainQuestionMatch && !line.match(/^[A-D]\s*[\.)]/i)) {
+      const plainQuestionMatch = line.match(/^(?:Q(?:uestion)?\s*)?(?:\d+[.)]|[A-D][.)])?\s*(.+)$/i);
+      if (plainQuestionMatch && !line.match(/^[A-D]\s*[.)]/i)) {
         const value = plainQuestionMatch[1]?.trim() || '';
         if (questionText) {
           flushQuestion(questionText, optionMap);
@@ -163,7 +161,7 @@ const parseBulkQuestionText = (raw: string): QuestionDraft[] => {
       }
 
       if (!questionText) {
-        questionText = line.replace(/^(?:Q(?:uestion)?\s*)?\d+[\.)]\s*/i, '').trim();
+        questionText = line.replace(/^(?:Q(?:uestion)?\s*)?\d+[.)]\s*/i, '').trim();
       } else if (!Object.keys(optionMap).length) {
         questionText = `${questionText} ${line}`.trim();
       }
@@ -192,7 +190,6 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [showLiveWarning, setShowLiveWarning] = useState(false);
   const [liveAttemptCount, setLiveAttemptCount] = useState(0);
   const [quizId, setQuizId] = useState<string | null>(quiz?.id || null);
   const [bulkImportText, setBulkImportText] = useState('');
@@ -589,7 +586,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
   if (filledCount < TARGET_QUESTIONS) {
     validationIssues.push(`${TARGET_QUESTIONS - filledCount} more question(s) needed (currently ${filledCount}/${TARGET_QUESTIONS})`);
   }
-  validQuestions.forEach((q, i) => {
+  validQuestions.forEach((q) => {
     if (!q.option_a.trim() || !q.option_b.trim() || !q.option_c.trim() || !q.option_d.trim()) {
       validationIssues.push(`Question ${q.question_number} is missing one or more options`);
     }
