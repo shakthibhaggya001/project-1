@@ -119,8 +119,8 @@ export default function StudentQuiz({ onBack }: Props) {
 
     const checkTime = async () => {
       const { data, error } = await supabase.rpc('get_server_time');
-      if (error || !active) return;
-      const now = new Date(data as string);
+      if (!active) return;
+      const now = error ? new Date() : new Date(data as string);
       const start = new Date(selectedQuiz.start_time);
       const end = new Date(selectedQuiz.end_time);
 
@@ -649,22 +649,8 @@ export default function StudentQuiz({ onBack }: Props) {
   // ---- Join screen (info form + START NOW) ----
   if (phase === 'join' && selectedQuiz) {
     const status = getQuizStatus(selectedQuiz);
-    const accessible = isAccessible(selectedQuiz);
 
-    if (!accessible) {
-      if (status === 'upcoming') {
-        return (
-          <ClosedScreen
-            icon={<Clock className="w-12 h-12 text-blue-500" />}
-            title="Exam Not Open Yet"
-            message={`This exam opens on ${formatDate(selectedQuiz.start_time)} at ${formatTimeOfDay(selectedQuiz.start_time)}. You can enter the exam room 10 minutes before the start time.`}
-            onBack={() => {
-              setPhase('select');
-              setSelectedQuiz(null);
-            }}
-          />
-        );
-      }
+    if (status === 'closed') {
       return (
         <ClosedScreen
           icon={<Lock className="w-12 h-12 text-slate-400" />}
@@ -874,7 +860,7 @@ export default function StudentQuiz({ onBack }: Props) {
                     className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition flex items-center justify-center gap-2 text-lg shadow-lg shadow-green-600/30"
                   >
                     {starting ? <Loader2 className="w-6 h-6 animate-spin" /> : <PlayCircle className="w-6 h-6" />}
-                    {starting ? 'Starting...' : 'START NOW'}
+                    {starting ? 'Starting...' : 'Enter Exam'}
                   </button>
                 ) : (
                   <div className="text-center text-slate-500 text-sm">
@@ -917,7 +903,7 @@ export default function StudentQuiz({ onBack }: Props) {
                 <button
                   key={quiz.id}
                   onClick={() => selectQuiz(quiz)}
-                  disabled={!accessible}
+                  disabled={status === 'closed'}
                   className="w-full text-left bg-white border border-slate-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed group"
                 >
                   <div className="flex items-center justify-between gap-4">
