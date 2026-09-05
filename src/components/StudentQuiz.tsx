@@ -47,6 +47,7 @@ export default function StudentQuiz({ onBack }: Props) {
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [questionsError, setQuestionsError] = useState<string | null>(null);
 
   const [studentName, setStudentName] = useState('');
   const [studentGrade, setStudentGrade] = useState<'10' | '11' | ''>('');
@@ -96,13 +97,19 @@ export default function StudentQuiz({ onBack }: Props) {
   useEffect(() => {
     if (!selectedQuiz) return;
     setQuestionsLoading(true);
+    setQuestionsError(null);
     supabase
       .from('questions')
       .select('*')
       .eq('quiz_id', selectedQuiz.id)
       .order('question_number', { ascending: true })
       .then(({ data, error }) => {
-        if (!error && data) setQuestions(data as Question[]);
+        if (error) {
+          setQuestions([]);
+          setQuestionsError(error.message);
+        } else {
+          setQuestions((data || []) as Question[]);
+        }
         setQuestionsLoading(false);
       });
   }, [selectedQuiz]);
@@ -427,6 +434,35 @@ export default function StudentQuiz({ onBack }: Props) {
         return;
       }
 
+      // Reload after the attempt is created so the exam never opens with a
+      // stale or empty question list from the selection screen.
+      setQuestionsLoading(true);
+      setQuestionsError(null);
+      const { data: questionRows, error: questionError } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('quiz_id', selectedQuiz.id)
+        .order('question_number', { ascending: true });
+
+      if (questionError) {
+        setQuestions([]);
+        setQuestionsError(questionError.message);
+        setQuestionsLoading(false);
+        setJoinError(`Unable to load exam questions: ${questionError.message}`);
+        return;
+      }
+
+      const loadedQuestions = (questionRows || []) as Question[];
+      if (loadedQuestions.length === 0) {
+        setQuestions([]);
+        setQuestionsError('No questions have been added to this exam yet.');
+        setQuestionsLoading(false);
+        setJoinError('This exam has no questions yet. Please contact the administrator.');
+        return;
+      }
+      setQuestions(loadedQuestions);
+      setQuestionsLoading(false);
+
       // Server confirmed — set up attempt
       submissionIdRef.current = result.submission_id || '';
       startedAtRef.current = result.attempt_started_at || result.server_time || '';
@@ -675,7 +711,7 @@ export default function StudentQuiz({ onBack }: Props) {
             </div>
           ) : (
             <div className="text-center py-12 text-slate-400">
-              <p>No questions available.</p>
+              <p>{questionsError || 'No questions available.'}</p>
             </div>
           )}
 

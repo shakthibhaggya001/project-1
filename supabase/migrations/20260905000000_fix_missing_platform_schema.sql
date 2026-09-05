@@ -482,7 +482,7 @@ $$;
 GRANT EXECUTE ON FUNCTION generate_quiz_results(uuid) TO authenticated;
 
 INSERT INTO site_settings (id, portal_title, subtitle, description, contact_numbers, poster_url, primary_color, background_color, card_color, motivational_banner_url, motivational_quote, show_motivational_banner)
-VALUES (1, 'Test your knowledge. Claim your rank.', 'Online Examination Portal', '40 questions. 40 minutes. Take the timed exam and check your results as soon as they are published.', '', '', '#1c4f9d', '#171918', '#2b312c', '', '', true)
+SELECT 1, 'Test your knowledge. Claim your rank.', 'Online Examination Portal', '40 questions. 40 minutes. Take the timed exam and check your results as soon as they are published.', '', '', '#1c4f9d', '#171918', '#2b312c', '', '', true
 WHERE NOT EXISTS (
   SELECT 1 FROM site_settings WHERE id = 1
 );
