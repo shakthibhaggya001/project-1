@@ -191,7 +191,12 @@ export default function AdminDashboard({ onCreateQuiz, onSiteSettings, onEditPap
         await refreshSelectedQuiz();
       }
     } catch (err) {
-      setActionResult(`Error: ${err instanceof Error ? err.message : 'Failed to generate results'}`);
+      const message = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+        ? String((err as { message?: unknown }).message)
+        : 'Failed to generate results';
+      setActionResult(`Error: ${message}`);
     } finally {
       setGenerating(false);
     }

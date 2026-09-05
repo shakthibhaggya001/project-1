@@ -100,7 +100,7 @@ const parseAnswerKeyText = (raw: string): Partial<Record<number, AnswerOption>> 
 };
 
 const parseBulkQuestionText = (raw: string): QuestionDraft[] => {
-  const cleaned = raw.replace(/\r/g, '').trim();
+  const cleaned = raw.replace(/\\r/g, '\r').replace(/\\n/g, '\n').replace(/\r/g, '').trim();
   if (!cleaned) return [];
 
   const rawBlocks = cleaned
@@ -448,6 +448,20 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
     setStatusMsg(null);
     try {
       const saveErrors: string[] = [];
+      let questionsToSave = questions;
+
+      // Treat pasted bulk text as part of Save Changes, so it cannot be left unsaved.
+      if (bulkImportText.trim()) {
+        const importedQuestions = parseBulkQuestionText(bulkImportText);
+        if (importedQuestions.length === 0) {
+          setError('Could not read the pasted questions. Use question numbers and A, B, C, and D options.');
+          return;
+        }
+        questionsToSave = importedQuestions;
+        setQuestions(importedQuestions);
+        setBulkImportText('');
+      }
+
       let id = quizId;
       if (!id) {
         id = await createQuizAndSave();
@@ -457,8 +471,8 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
       }
 
       // Save all dirty/new questions
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
+      for (let i = 0; i < questionsToSave.length; i++) {
+        const q = questionsToSave[i];
         if (!q.question_text.trim()) continue;
 
         if (q.id) {

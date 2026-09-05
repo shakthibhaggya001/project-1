@@ -122,6 +122,9 @@ ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS motivational_banner_url text 
 ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS motivational_quote text NOT NULL DEFAULT '';
 ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS show_motivational_banner boolean NOT NULL DEFAULT true;
 ALTER TABLE questions ADD COLUMN IF NOT EXISTS marks int NOT NULL DEFAULT 1;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS results_generated boolean NOT NULL DEFAULT false;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS results_confirmed boolean NOT NULL DEFAULT false;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS results_published boolean NOT NULL DEFAULT false;
 
 CREATE INDEX IF NOT EXISTS idx_questions_quiz_id ON questions(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_questions_quiz_id_qnum ON questions(quiz_id, question_number);
@@ -454,7 +457,13 @@ AS $$
 DECLARE
   v_total int;
   v_top_score int;
+  v_quiz_exists boolean;
 BEGIN
+  SELECT EXISTS(SELECT 1 FROM quizzes WHERE id = p_quiz_id) INTO v_quiz_exists;
+  IF NOT v_quiz_exists THEN
+    RETURN jsonb_build_object('error', 'Quiz not found');
+  END IF;
+
   WITH scored AS (
     SELECT s.id,
       (
@@ -465,11 +474,17 @@ BEGIN
       ) AS calc_score
     FROM submissions s
     WHERE s.quiz_id = p_quiz_id
+      AND s.status = 'submitted'
   )
   UPDATE submissions s
   SET score = scored.calc_score
   FROM scored
   WHERE s.id = scored.id;
+
+  UPDATE submissions
+  SET rank = NULL
+  WHERE quiz_id = p_quiz_id
+    AND status <> 'submitted';
 
   SELECT count(*)::int INTO v_total FROM submissions WHERE quiz_id = p_quiz_id;
   SELECT COALESCE(max(score), 0) INTO v_top_score FROM submissions WHERE quiz_id = p_quiz_id;
