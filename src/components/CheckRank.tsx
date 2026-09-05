@@ -136,7 +136,12 @@ export default function CheckRank({ onBack }: Props) {
         }
       }
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : 'Failed to look up result.');
+      const message = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+        ? String((err as { message?: unknown }).message)
+        : 'Failed to look up result.';
+      setSearchError(message);
     } finally {
       setSearching(false);
     }

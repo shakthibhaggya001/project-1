@@ -109,8 +109,21 @@ export default function AdminDashboard({ onCreateQuiz, onSiteSettings, onEditPap
     (async () => {
       const counts: Record<string, number> = {};
       for (const quiz of quizzes) {
-        const { data } = await supabase.rpc('get_quiz_question_count', { p_quiz_id: quiz.id });
-        counts[quiz.id] = (data as number) || 0;
+        const { count, error: countError } = await supabase
+          .from('questions')
+          .select('id', { count: 'exact', head: true })
+          .eq('quiz_id', quiz.id);
+
+        if (!countError) {
+          counts[quiz.id] = count || 0;
+          continue;
+        }
+
+        // Keep compatibility with projects where the direct count policy is older.
+        const { data: rpcCount, error: rpcError } = await supabase.rpc('get_quiz_question_count', {
+          p_quiz_id: quiz.id,
+        });
+        counts[quiz.id] = rpcError ? 0 : Number(rpcCount) || 0;
       }
       setQuestionCounts(counts);
     })();
