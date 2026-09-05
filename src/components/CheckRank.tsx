@@ -115,9 +115,25 @@ export default function CheckRank({ onBack }: Props) {
       if (r.error) {
         setSearchError(r.error);
       } else {
-        setResult(r);
+        const totalQuestions = Number(r.total_questions) || 0;
+        const correct = Number(r.correct ?? r.score) || 0;
+        const answered = Number(r.unanswered) >= 0
+          ? totalQuestions - Number(r.unanswered)
+          : correct;
+        const normalizedResult: StudentResult = {
+          ...r,
+          correct,
+          incorrect: Number.isFinite(Number(r.incorrect))
+            ? Number(r.incorrect)
+            : Math.max(answered - correct, 0),
+          unanswered: Math.max(Number(r.unanswered) || 0, 0),
+          percentage: Number.isFinite(Number(r.percentage))
+            ? Number(r.percentage)
+            : (correct / Math.max(totalQuestions, 1)) * 100,
+        };
+        setResult(normalizedResult);
         // If top 10, get upload token
-        if (r.is_top_10) {
+        if (normalizedResult.is_top_10) {
           const { data: tokenData, error: tokenError } = await supabase.rpc(
             'verify_top10_and_get_upload_token',
             {
@@ -130,7 +146,7 @@ export default function CheckRank({ onBack }: Props) {
             const token = tokenData as UploadToken;
             if (token.ok) {
               setUploadToken(token);
-              if (r.photo_url) setPhotoPreview(r.photo_url);
+              if (normalizedResult.photo_url) setPhotoPreview(normalizedResult.photo_url);
             }
           }
         }
