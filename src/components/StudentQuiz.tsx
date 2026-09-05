@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase, type Quiz, type Question } from '@/lib/supabase';
-import { getQuizStatus, formatTime, formatDate, formatTimeOfDay, isAccessible, isEnglishText, normalizePhone } from '@/lib/utils';
+import { getQuizStatus, formatTime, formatCountdown, formatDate, formatTimeOfDay, isAccessible, isEnglishText, normalizePhone } from '@/lib/utils';
 import {
   Brain,
   Clock,
@@ -840,7 +840,7 @@ export default function StudentQuiz({ onBack }: Props) {
                       <div className="inline-flex items-center gap-2 text-blue-700">
                         <Clock className="w-5 h-5" />
                         <span className="text-2xl font-bold tabular-nums">
-                          {formatTime(timeUntilStart)}
+                          {formatCountdown(timeUntilStart)}
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-2">until exam starts</p>
