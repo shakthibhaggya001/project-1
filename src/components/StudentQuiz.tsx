@@ -291,6 +291,112 @@ export default function StudentQuiz({ onBack }: Props) {
     return null;
   };
 
+  const startAttemptFallback = async (): Promise<StartResult> => {
+    const normalizedPhone = normalizePhone(whatsappNumber);
+    const studentPayload = {
+      full_name: studentName.trim(),
+      school: schoolName.trim(),
+      grade: studentGrade ? Number(studentGrade) : null,
+      whatsapp_number: whatsappNumber.trim(),
+      normalized_whatsapp: normalizedPhone,
+    };
+
+    const { data: studentData, error: studentError } = await supabase
+      .from('students')
+      .upsert(studentPayload, { onConflict: 'normalized_whatsapp' })
+      .select('id')
+      .single();
+
+    if (studentError || !studentData?.id) {
+      return {
+        error: 'identity_failed',
+        message: studentError?.message || 'Failed to create student identity.',
+      };
+    }
+
+    const { data: existingSubmission, error: existingError } = await supabase
+      .from('submissions')
+      .select('*')
+      .eq('quiz_id', selectedQuiz!.id)
+      .or(`student_id.eq.${studentData.id},normalized_whatsapp.eq.${normalizedPhone}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      return {
+        error: 'lookup_failed',
+        message: existingError.message || 'Failed to check existing exam attempt.',
+      };
+    }
+
+    if (existingSubmission) {
+      const status = existingSubmission.status as string;
+      if (status === 'submitted') {
+        return { error: 'already_submitted', message: 'You have already attempted this examination.' };
+      }
+      if (status === 'expired') {
+        return { error: 'expired', message: 'This examination attempt has expired.' };
+      }
+      if (status === 'in_progress' || status === 'interrupted') {
+        return {
+          ok: true,
+          action: 'resume',
+          submission_id: existingSubmission.id,
+          student_id: studentData.id,
+          server_time: new Date().toISOString(),
+          start_time: selectedQuiz!.start_time,
+          end_time: selectedQuiz!.end_time,
+          effective_end_time: existingSubmission.time_extension_until || selectedQuiz!.end_time,
+          attempt_started_at: existingSubmission.attempt_started_at || existingSubmission.started_at,
+          saved_answers: existingSubmission.answers || {},
+          message: 'Resuming your previous attempt.',
+        };
+      }
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('submissions')
+      .insert({
+        quiz_id: selectedQuiz!.id,
+        student_name: studentName.trim(),
+        whatsapp_number: whatsappNumber.trim(),
+        grade: studentGrade ? Number(studentGrade) : null,
+        school_name: schoolName.trim(),
+        answers: {},
+        started_at: new Date().toISOString(),
+        submitted_at: new Date().toISOString(),
+        status: 'in_progress',
+        attempt_started_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(),
+        normalized_name: studentName.trim().toUpperCase(),
+        normalized_whatsapp: normalizedPhone,
+        student_id: studentData.id,
+      })
+      .select('id, attempt_started_at, started_at')
+      .single();
+
+    if (insertError || !inserted?.id) {
+      return {
+        error: 'insert_failed',
+        message: insertError?.message || 'Failed to create a new exam attempt.',
+      };
+    }
+
+    return {
+      ok: true,
+      action: 'new',
+      submission_id: inserted.id,
+      student_id: studentData.id,
+      server_time: new Date().toISOString(),
+      start_time: selectedQuiz!.start_time,
+      end_time: selectedQuiz!.end_time,
+      effective_end_time: selectedQuiz!.end_time,
+      attempt_started_at: inserted.attempt_started_at || inserted.started_at,
+      message: 'Exam started.',
+    };
+  };
+
   // START NOW — calls server to create/resume attempt
   const handleStartNow = async () => {
     if (!selectedQuiz) return;
@@ -307,12 +413,43 @@ export default function StudentQuiz({ onBack }: Props) {
       const { data, error } = await supabase.rpc('start_or_resume_attempt', {
         p_quiz_id: selectedQuiz.id,
         p_student_name: studentName.trim(),
-        p_whatsapp_number: whatsappNumber.trim(),
+        p_whatsapp_number: normalizePhone(whatsappNumber),
         p_grade: studentGrade ? parseInt(studentGrade) : null,
         p_school_name: schoolName.trim(),
       });
-      if (error) throw error;
-      const result = data as StartResult;
+
+      let result = data as StartResult | null;
+
+      if (error) {
+        const fallbackResult = await startAttemptFallback();
+        if (fallbackResult.error) {
+          if (fallbackResult.error === 'already_submitted') {
+            setJoinError('You have already attempted this examination.');
+          } else if (fallbackResult.error === 'expired') {
+            setJoinError('This examination attempt has expired.');
+          } else if (fallbackResult.error === 'before_start') {
+            setJoinError('Your exam will begin shortly. Please wait for the official start time.');
+          } else if (fallbackResult.error === 'after_end') {
+            setJoinError('The exam window has closed.');
+          } else if (fallbackResult.error === 'resume_not_allowed') {
+            setJoinError('Your previous examination session was interrupted. Please contact the administrator to resume this examination.');
+          } else if (fallbackResult.error === 'invalid_phone') {
+            setJoinError('Please enter a valid WhatsApp / Mobile number.');
+          } else if (fallbackResult.error === 'invalid_name') {
+            setJoinError('Please enter your name.');
+          } else {
+            setJoinError(fallbackResult.message || error.message || 'Failed to start exam. Please try again.');
+          }
+          return;
+        }
+        result = fallbackResult;
+      }
+
+      if (!result) {
+        setJoinError('Failed to start exam. Please try again.');
+        return;
+      }
+
       if (result.error) {
         if (result.error === 'already_submitted') {
           setJoinError('You have already attempted this examination.');
@@ -373,8 +510,8 @@ export default function StudentQuiz({ onBack }: Props) {
       submittedRef.current = false;
       setAutoSubmitted(false);
       setPhase('quiz');
-    } catch {
-      setJoinError('Failed to start exam. Please try again.');
+    } catch (err) {
+      setJoinError(err instanceof Error ? err.message : 'Failed to start exam. Please try again.');
     } finally {
       setStarting(false);
     }
