@@ -247,8 +247,9 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
 
   // Cleanup autosave timers on unmount
   useEffect(() => {
+    const timers = autosaveTimers.current;
     return () => {
-      Object.values(autosaveTimers.current).forEach((t) => clearTimeout(t));
+      Object.values(timers).forEach((t) => clearTimeout(t));
     };
   }, []);
 

@@ -36,6 +36,8 @@ export type Question = {
   correct_answer: 'A' | 'B' | 'C' | 'D';
 };
 
+export type PublicQuestion = Omit<Question, 'correct_answer'>;
+
 export type Submission = {
   id: string;
   quiz_id: string;

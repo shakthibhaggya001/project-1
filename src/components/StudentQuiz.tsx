@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { supabase, type Quiz, type Question } from '@/lib/supabase';
+import { supabase, type Quiz, type PublicQuestion } from '@/lib/supabase';
 import { getQuizStatus, formatTime, formatCountdown, formatDate, formatTimeOfDay, isAccessible, isEnglishText, normalizePhone } from '@/lib/utils';
 import {
   Brain,
@@ -44,7 +44,7 @@ export default function StudentQuiz({ onBack }: Props) {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<PublicQuestion[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
 
@@ -98,16 +98,13 @@ export default function StudentQuiz({ onBack }: Props) {
     setQuestionsLoading(true);
     setQuestionsError(null);
     supabase
-      .from('questions')
-      .select('*')
-      .eq('quiz_id', selectedQuiz.id)
-      .order('question_number', { ascending: true })
+      .rpc('get_exam_questions', { p_quiz_id: selectedQuiz.id })
       .then(({ data, error }) => {
         if (error) {
           setQuestions([]);
           setQuestionsError(error.message);
         } else {
-          setQuestions((data || []) as Question[]);
+          setQuestions((data || []) as PublicQuestion[]);
         }
         setQuestionsLoading(false);
       });
@@ -166,7 +163,6 @@ export default function StudentQuiz({ onBack }: Props) {
     return () => {
       if (saveTimerRef.current) clearInterval(saveTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
   // Countdown timer (overall + per-question)
@@ -297,67 +293,10 @@ export default function StudentQuiz({ onBack }: Props) {
     return null;
   };
 
-  const startAttemptFallback = async (): Promise<StartResult> => {
-    const normalizedPhone = normalizePhone(whatsappNumber);
-
-    const { data: existingRows, error: existingError } = await supabase
-      .from('submissions')
-      .select('id, answers, started_at, submitted_at, whatsapp_number, student_name')
-      .eq('quiz_id', selectedQuiz!.id);
-
-    if (existingError) {
-      return {
-        error: 'lookup_failed',
-        message: existingError.message || 'Failed to check existing exam attempt.',
-      };
-    }
-
-    const existingSubmission = (existingRows || []).find((row) => {
-      const rowPhone = normalizePhone(String(row.whatsapp_number || ''));
-      const samePhone = rowPhone === normalizedPhone;
-      const sameName = String(row.student_name || '').trim().toLowerCase() === studentName.trim().toLowerCase();
-      return samePhone || (sameName && rowPhone.length >= 8);
-    });
-
-    if (existingSubmission) {
-      return { error: 'already_submitted', message: 'You have already attempted this examination.' };
-    }
-
-    const { data: inserted, error: insertError } = await supabase
-      .from('submissions')
-      .insert({
-        quiz_id: selectedQuiz!.id,
-        student_name: studentName.trim(),
-        whatsapp_number: whatsappNumber.trim(),
-        grade: studentGrade ? Number(studentGrade) : null,
-        school_name: schoolName.trim(),
-        answers: {},
-        started_at: new Date().toISOString(),
-        submitted_at: new Date().toISOString(),
-      })
-      .select('id, started_at')
-      .single();
-
-    if (insertError || !inserted?.id) {
-      return {
-        error: 'insert_failed',
-        message: insertError?.message || 'Failed to create a new exam attempt.',
-      };
-    }
-
-    return {
-      ok: true,
-      action: 'new',
-      submission_id: inserted.id,
-      student_id: undefined,
-      server_time: new Date().toISOString(),
-      start_time: selectedQuiz!.start_time,
-      end_time: selectedQuiz!.end_time,
-      effective_end_time: selectedQuiz!.end_time,
-      attempt_started_at: inserted.started_at,
-      message: 'Exam started.',
-    };
-  };
+  const startAttemptFallback = async (): Promise<StartResult> => ({
+    error: 'start_unavailable',
+    message: 'The exam service is unavailable. Please try again shortly.',
+  });
 
   // START NOW — calls server to create/resume attempt
   const handleStartNow = async () => {
@@ -437,11 +376,9 @@ export default function StudentQuiz({ onBack }: Props) {
       // stale or empty question list from the selection screen.
       setQuestionsLoading(true);
       setQuestionsError(null);
-      const { data: questionRows, error: questionError } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('quiz_id', selectedQuiz.id)
-        .order('question_number', { ascending: true });
+      const { data: questionRows, error: questionError } = await supabase.rpc('get_exam_questions', {
+        p_quiz_id: selectedQuiz.id,
+      });
 
       if (questionError) {
         setQuestions([]);
@@ -451,7 +388,7 @@ export default function StudentQuiz({ onBack }: Props) {
         return;
       }
 
-      const loadedQuestions = (questionRows || []) as Question[];
+      const loadedQuestions = (questionRows || []) as PublicQuestion[];
       if (loadedQuestions.length === 0) {
         setQuestions([]);
         setQuestionsError('No questions have been added to this exam yet.');
@@ -668,7 +605,7 @@ export default function StudentQuiz({ onBack }: Props) {
                 </div>
                 <div className="grid grid-cols-1 gap-2.5">
                   {(['A', 'B', 'C', 'D'] as const).map((letter) => {
-                    const optionText = currentQ[`option_${letter.toLowerCase()}` as keyof Question] as string;
+                    const optionText = currentQ[`option_${letter.toLowerCase()}` as keyof PublicQuestion] as string;
                     const isSelected = answers[currentQ.question_number] === letter;
                     return (
                       <button

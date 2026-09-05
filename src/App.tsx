@@ -14,7 +14,7 @@ import type { Quiz } from '@/lib/supabase';
 type Route = 'home' | 'take-quiz' | 'check-rank' | 'admin' | 'create-quiz' | 'edit-paper' | 'site-settings';
 
 function AppContent() {
-  const { session, loading, signOut } = useAuth();
+  const { session, isAdmin, loading, signOut } = useAuth();
   const { loading: settingsLoading } = useSiteSettings();
   const [route, setRoute] = useState<Route>('home');
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
@@ -31,6 +31,19 @@ function AppContent() {
   if (route === 'admin' || route === 'create-quiz' || route === 'edit-paper' || route === 'site-settings') {
     if (!session) {
       return <AdminLogin />;
+    }
+    if (!isAdmin) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
+          <div className="max-w-md">
+            <h1 className="text-2xl font-bold text-slate-900">Admin access required</h1>
+            <p className="mt-2 text-slate-600">This account is not authorized to manage the quiz platform.</p>
+            <button onClick={signOut} className="mt-6 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white">
+              Sign out
+            </button>
+          </div>
+        </div>
+      );
     }
     if (route === 'create-quiz') {
       return <PaperEditor quiz={null} mode="create" onBack={() => setRoute('admin')} onSaved={() => setRoute('admin')} />;
