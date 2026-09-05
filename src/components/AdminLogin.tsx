@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { Brain, Eye, EyeOff, Lock, Mail, Loader2, UserPlus, KeyRound } from 'lucide-react';
 
 export default function AdminLogin() {
-  const { signIn, signUp, signOut, refreshAdmin } = useAuth();
+  const { signIn, signUp, signOut } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,9 +36,10 @@ export default function AdminLogin() {
         if (codeError || !(data as { ok?: boolean } | null)?.ok) {
           await signOut();
           setError(codeError?.message || 'Invalid admin access code.');
-        } else if (!(await refreshAdmin())) {
-          await signOut();
-          setError('Admin access could not be enabled for this account.');
+        } else {
+          // Reload so AuthProvider reads the newly persisted admin_users row.
+          window.location.reload();
+          return;
         }
       }
     } else {
