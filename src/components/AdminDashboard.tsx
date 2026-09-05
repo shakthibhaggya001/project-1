@@ -82,6 +82,15 @@ export default function AdminDashboard({ onCreateQuiz, onSiteSettings, onEditPap
       .order('created_at', { ascending: false });
     if (error) {
       console.error(error);
+
+      const isAuthError = /jwt|token|expired|session|unauthorized|not authenticated/i.test(error.message);
+      if (isAuthError) {
+        await supabase.auth.signOut();
+        setLoadError('Your session has expired. Please sign in again.');
+        setLoading(false);
+        return;
+      }
+
       setLoadError(error.message);
       setLoading(false);
       return;

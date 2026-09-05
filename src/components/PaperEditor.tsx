@@ -258,10 +258,14 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
     };
   }, []);
 
-  const updateQuestion = useCallback((idx: number, field: keyof QuestionDraft, value: string | number) => {
+  type QuestionField = keyof QuestionDraft | `option_${'a' | 'b' | 'c' | 'd'}`;
+
+  const updateQuestion = useCallback((idx: number, field: QuestionField, value: string | number) => {
+    const normalizedField = field as keyof QuestionDraft;
+
     setQuestions((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], [field]: value, dirty: true, saved: false };
+      next[idx] = { ...next[idx], [normalizedField]: value as never, dirty: true, saved: false };
       return next;
     });
 
@@ -998,7 +1002,10 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
                       <input
                         type="text"
                         value={q[`option_${letter.toLowerCase()}` as keyof QuestionDraft] as string}
-                        onChange={(e) => updateQuestion(idx, `option_${letter.toLowerCase()}`, e.target.value)}
+                        onChange={(e) => {
+                          const optionField = `option_${letter.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d';
+                          updateQuestion(idx, optionField, e.target.value);
+                        }}
                         className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder={`Option ${letter}`}
                       />
