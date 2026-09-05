@@ -25,7 +25,7 @@ type Props = {
 
 type StudentResult = {
   score: number;
-  rank: number;
+  rank: number | null;
   total_participants: number;
   total_questions: number;
   correct: number;
@@ -366,7 +366,7 @@ export default function CheckRank({ onBack }: Props) {
                     </p>
                   </div>
 
-                  {/* Island rank */}
+                    {/* Island rank */}
                   <div
                     className={`p-5 text-center sm:p-6 ${
                       result.rank === 1
@@ -380,7 +380,7 @@ export default function CheckRank({ onBack }: Props) {
                         : 'bg-gradient-to-br from-slate-700 to-slate-900'
                     }`}
                   >
-                    {result.rank <= 3 && (
+                    {result.rank !== null && result.rank <= 3 && (
                       <div className="mb-2">
                         {result.rank === 1 && <Trophy className="w-10 h-10 sm:w-12 sm:h-12 text-white mx-auto" />}
                         {result.rank === 2 && <Medal className="w-10 h-10 sm:w-12 sm:h-12 text-white mx-auto" />}
@@ -388,10 +388,10 @@ export default function CheckRank({ onBack }: Props) {
                       </div>
                     )}
                     <p className="text-4xl sm:text-5xl font-bold text-white tabular-nums">
-                      #{result.rank}
+                      {result.rank ? `#${result.rank}` : 'Pending'}
                     </p>
                     <p className="text-white/90 text-sm sm:text-base font-semibold mt-1.5">
-                      දිවයිනේ කුසලතාවය
+                      Island Rank / දිවයිනේ කුසලතාවය
                     </p>
                     <p className="text-white/70 text-xs sm:text-sm mt-0.5">
                       out of {result.total_participants} participants
