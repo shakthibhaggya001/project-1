@@ -122,6 +122,7 @@ export default function CheckRank({ onBack }: Props) {
           : correct;
         const normalizedResult: StudentResult = {
           ...r,
+          rank: r.rank ?? (Number(r.total_participants) === 1 ? 1 : null),
           correct,
           incorrect: Number.isFinite(Number(r.incorrect))
             ? Number(r.incorrect)
