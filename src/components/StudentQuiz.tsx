@@ -293,35 +293,11 @@ export default function StudentQuiz({ onBack }: Props) {
 
   const startAttemptFallback = async (): Promise<StartResult> => {
     const normalizedPhone = normalizePhone(whatsappNumber);
-    const studentPayload = {
-      full_name: studentName.trim(),
-      school: schoolName.trim(),
-      grade: studentGrade ? Number(studentGrade) : null,
-      whatsapp_number: whatsappNumber.trim(),
-      normalized_whatsapp: normalizedPhone,
-    };
 
-    const { data: studentData, error: studentError } = await supabase
-      .from('students')
-      .upsert(studentPayload, { onConflict: 'normalized_whatsapp' })
-      .select('id')
-      .single();
-
-    if (studentError || !studentData?.id) {
-      return {
-        error: 'identity_failed',
-        message: studentError?.message || 'Failed to create student identity.',
-      };
-    }
-
-    const { data: existingSubmission, error: existingError } = await supabase
+    const { data: existingRows, error: existingError } = await supabase
       .from('submissions')
-      .select('*')
-      .eq('quiz_id', selectedQuiz!.id)
-      .or(`student_id.eq.${studentData.id},normalized_whatsapp.eq.${normalizedPhone}`)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .select('id, status, answers, attempt_started_at, started_at, whatsapp_number, normalized_whatsapp, time_extension_until, student_name')
+      .eq('quiz_id', selectedQuiz!.id);
 
     if (existingError) {
       return {
@@ -330,8 +306,16 @@ export default function StudentQuiz({ onBack }: Props) {
       };
     }
 
+    const existingSubmission = (existingRows || []).find((row) => {
+      const rowPhone = normalizePhone(String(row.whatsapp_number || ''));
+      const rowNormalized = normalizePhone(String(row.normalized_whatsapp || ''));
+      const samePhone = rowPhone === normalizedPhone || rowNormalized === normalizedPhone;
+      const sameName = String(row.student_name || '').trim().toLowerCase() === studentName.trim().toLowerCase();
+      return samePhone || (sameName && rowPhone.length >= 8);
+    });
+
     if (existingSubmission) {
-      const status = existingSubmission.status as string;
+      const status = String(existingSubmission.status || '').toLowerCase();
       if (status === 'submitted') {
         return { error: 'already_submitted', message: 'You have already attempted this examination.' };
       }
@@ -343,7 +327,7 @@ export default function StudentQuiz({ onBack }: Props) {
           ok: true,
           action: 'resume',
           submission_id: existingSubmission.id,
-          student_id: studentData.id,
+          student_id: undefined,
           server_time: new Date().toISOString(),
           start_time: selectedQuiz!.start_time,
           end_time: selectedQuiz!.end_time,
@@ -369,9 +353,6 @@ export default function StudentQuiz({ onBack }: Props) {
         status: 'in_progress',
         attempt_started_at: new Date().toISOString(),
         last_activity_at: new Date().toISOString(),
-        normalized_name: studentName.trim().toUpperCase(),
-        normalized_whatsapp: normalizedPhone,
-        student_id: studentData.id,
       })
       .select('id, attempt_started_at, started_at')
       .single();
@@ -387,7 +368,7 @@ export default function StudentQuiz({ onBack }: Props) {
       ok: true,
       action: 'new',
       submission_id: inserted.id,
-      student_id: studentData.id,
+      student_id: undefined,
       server_time: new Date().toISOString(),
       start_time: selectedQuiz!.start_time,
       end_time: selectedQuiz!.end_time,
