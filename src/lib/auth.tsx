@@ -20,8 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
 
   const refreshAdmin = async () => {
-    const { data } = await supabase.rpc('is_admin');
-    const authorized = data === true;
+    const { data, error } = await supabase.rpc('is_admin');
+    const authorized = !error && data === true;
     setIsAdmin(authorized);
     return authorized;
   };
@@ -73,6 +73,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initializeSession();
 
+    const restoreSessionOnReturn = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const { data } = await supabase.auth.getSession();
+      if (!active) return;
+      setSession(data.session);
+      if (data.session) await refreshAdmin();
+    };
+    document.addEventListener('visibilitychange', restoreSessionOnReturn);
+
     const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       if (!s) {
@@ -85,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       active = false;
+      document.removeEventListener('visibilitychange', restoreSessionOnReturn);
       listener.subscription.unsubscribe();
     };
   }, []);

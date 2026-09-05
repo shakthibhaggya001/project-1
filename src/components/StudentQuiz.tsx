@@ -40,6 +40,11 @@ type StartResult = {
   saved_answers?: Record<string, string>;
 };
 
+type PublicQuestionRow = Omit<PublicQuestion, 'id' | 'quiz_id'> & {
+  id: string;
+  quiz_id: string;
+};
+
 export default function StudentQuiz({ onBack }: Props) {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +86,23 @@ export default function StudentQuiz({ onBack }: Props) {
   const answersRef = useRef<Record<number, string>>({});
   const saveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const loadExamQuestions = async (quizId: string) => {
+    const rpcResult = await supabase.rpc('get_exam_questions', { p_quiz_id: quizId });
+    if (!rpcResult.error) return { data: (rpcResult.data || []) as PublicQuestion[], error: null };
+
+    // Compatibility for databases that have not applied the secure RPC yet.
+    // Never select correct_answer on this public fallback.
+    const fallback = await supabase
+      .from('questions')
+      .select('id, quiz_id, question_number, question_text, option_a, option_b, option_c, option_d')
+      .eq('quiz_id', quizId)
+      .order('question_number', { ascending: true });
+    return {
+      data: (fallback.data || []) as PublicQuestionRow[],
+      error: fallback.error ? fallback.error : null,
+    };
+  };
+
   useEffect(() => {
     supabase
       .from('quizzes')
@@ -97,9 +119,7 @@ export default function StudentQuiz({ onBack }: Props) {
     if (!selectedQuiz) return;
     setQuestionsLoading(true);
     setQuestionsError(null);
-    supabase
-      .rpc('get_exam_questions', { p_quiz_id: selectedQuiz.id })
-      .then(({ data, error }) => {
+    loadExamQuestions(selectedQuiz.id).then(({ data, error }) => {
         if (error) {
           setQuestions([]);
           setQuestionsError(error.message);
@@ -376,9 +396,7 @@ export default function StudentQuiz({ onBack }: Props) {
       // stale or empty question list from the selection screen.
       setQuestionsLoading(true);
       setQuestionsError(null);
-      const { data: questionRows, error: questionError } = await supabase.rpc('get_exam_questions', {
-        p_quiz_id: selectedQuiz.id,
-      });
+      const { data: questionRows, error: questionError } = await loadExamQuestions(selectedQuiz.id);
 
       if (questionError) {
         setQuestions([]);
