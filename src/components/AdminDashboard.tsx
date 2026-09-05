@@ -219,7 +219,12 @@ export default function AdminDashboard({ onCreateQuiz, onSiteSettings, onEditPap
         await refreshSelectedQuiz();
       }
     } catch (err) {
-      setActionResult(`Error: ${err instanceof Error ? err.message : 'Failed to confirm results'}`);
+      const message = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+        ? String((err as { message?: unknown }).message)
+        : 'Failed to confirm results';
+      setActionResult(`Error: ${message}`);
     } finally {
       setConfirming(false);
     }

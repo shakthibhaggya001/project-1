@@ -497,6 +497,68 @@ $$;
 
 GRANT EXECUTE ON FUNCTION generate_quiz_results(uuid) TO authenticated;
 
+CREATE OR REPLACE FUNCTION confirm_quiz_results(p_quiz_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_generated boolean;
+BEGIN
+  SELECT results_generated INTO v_generated FROM quizzes WHERE id = p_quiz_id;
+  IF v_generated IS NULL THEN
+    RETURN jsonb_build_object('error', 'Quiz not found');
+  END IF;
+  IF NOT v_generated THEN
+    RETURN jsonb_build_object('error', 'Results must be generated first');
+  END IF;
+  UPDATE quizzes SET results_confirmed = true WHERE id = p_quiz_id;
+  RETURN jsonb_build_object('ok', true, 'quiz_id', p_quiz_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION confirm_quiz_results(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION publish_quiz_results(p_quiz_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_confirmed boolean;
+BEGIN
+  SELECT results_confirmed INTO v_confirmed FROM quizzes WHERE id = p_quiz_id;
+  IF v_confirmed IS NULL THEN
+    RETURN jsonb_build_object('error', 'Quiz not found');
+  END IF;
+  IF NOT v_confirmed THEN
+    RETURN jsonb_build_object('error', 'Results must be confirmed before publishing');
+  END IF;
+  UPDATE quizzes SET results_published = true WHERE id = p_quiz_id;
+  RETURN jsonb_build_object('ok', true, 'quiz_id', p_quiz_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION publish_quiz_results(uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION unpublish_quiz_results(p_quiz_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE quizzes
+  SET results_published = false, results_confirmed = false
+  WHERE id = p_quiz_id;
+  RETURN jsonb_build_object('ok', true, 'quiz_id', p_quiz_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION unpublish_quiz_results(uuid) TO authenticated;
+
 INSERT INTO site_settings (id, portal_title, subtitle, description, contact_numbers, poster_url, primary_color, background_color, card_color, motivational_banner_url, motivational_quote, show_motivational_banner)
 SELECT 1, 'Test your knowledge. Claim your rank.', 'Online Examination Portal', '40 questions. 40 minutes. Take the timed exam and check your results as soon as they are published.', '', '', '#1c4f9d', '#171918', '#2b312c', '', '', true
 WHERE NOT EXISTS (
