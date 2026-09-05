@@ -89,6 +89,39 @@ CREATE TABLE IF NOT EXISTS site_settings (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- CREATE TABLE IF NOT EXISTS does not repair tables created by older migrations.
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS student_identifier text NOT NULL DEFAULT '';
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS grade int;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS school_name text NOT NULL DEFAULT '';
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS whatsapp_number text NOT NULL DEFAULT '';
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS normalized_name text NOT NULL DEFAULT '';
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS normalized_whatsapp text NOT NULL DEFAULT '';
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS answers jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS score int NOT NULL DEFAULT 0;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS rank int;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS started_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS submitted_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS time_taken_seconds int;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS attempt_started_at timestamptz;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS last_activity_at timestamptz;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'submitted';
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS resume_allowed boolean NOT NULL DEFAULT false;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS resume_granted_by text NOT NULL DEFAULT '';
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS resume_granted_at timestamptz;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS resume_reason text NOT NULL DEFAULT '';
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS photo_url text DEFAULT '';
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS photo_uploaded_at timestamptz;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS student_id uuid;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS time_extension_until timestamptz;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS time_extension_granted_by text NOT NULL DEFAULT '';
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS time_extension_granted_at timestamptz;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS time_extension_reason text NOT NULL DEFAULT '';
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS question_snapshot jsonb DEFAULT '[]'::jsonb;
+
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS motivational_banner_url text NOT NULL DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS motivational_quote text NOT NULL DEFAULT '';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS show_motivational_banner boolean NOT NULL DEFAULT true;
+
 CREATE INDEX IF NOT EXISTS idx_questions_quiz_id ON questions(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_questions_quiz_id_qnum ON questions(quiz_id, question_number);
 CREATE INDEX IF NOT EXISTS idx_submissions_quiz_id ON submissions(quiz_id);
@@ -450,4 +483,6 @@ GRANT EXECUTE ON FUNCTION generate_quiz_results(uuid) TO authenticated;
 
 INSERT INTO site_settings (id, portal_title, subtitle, description, contact_numbers, poster_url, primary_color, background_color, card_color, motivational_banner_url, motivational_quote, show_motivational_banner)
 VALUES (1, 'Test your knowledge. Claim your rank.', 'Online Examination Portal', '40 questions. 40 minutes. Take the timed exam and check your results as soon as they are published.', '', '', '#1c4f9d', '#171918', '#2b312c', '', '', true)
-ON CONFLICT (id) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM site_settings WHERE id = 1
+);
