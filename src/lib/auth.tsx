@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 type AuthContextType = {
   session: Session | null;
   isAdmin: boolean;
+  refreshAdmin: () => Promise<boolean>;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -16,6 +17,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  const refreshAdmin = async () => {
+    const { data } = await supabase.rpc('is_admin');
+    const authorized = data === true;
+    setIsAdmin(authorized);
+    return authorized;
+  };
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,8 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         setSession(sessionData.session);
-        const { data: adminStatus } = await supabase.rpc('is_admin');
-        setIsAdmin(adminStatus === true);
+        await refreshAdmin();
       } catch {
         if (!active) return;
         setSession(null);
@@ -60,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!s) {
         setIsAdmin(false);
       } else {
-        void supabase.rpc('is_admin').then(({ data }) => setIsAdmin(data === true));
+        void refreshAdmin();
       }
       setLoading(false);
     });
@@ -87,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, isAdmin, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ session, isAdmin, refreshAdmin, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
