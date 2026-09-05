@@ -24,6 +24,7 @@ type Props = {
 };
 
 type StudentResult = {
+  submission_id?: string;
   score: number;
   rank: number | null;
   total_participants: number;
@@ -135,6 +136,15 @@ export default function CheckRank({ onBack }: Props) {
         setResult(normalizedResult);
         // If top 10, get upload token
         if (normalizedResult.is_top_10) {
+          if (normalizedResult.submission_id) {
+            setUploadToken({
+              ok: true,
+              submission_id: normalizedResult.submission_id,
+              rank: normalizedResult.rank ?? undefined,
+              quiz_id: selectedQuiz.id,
+            });
+            if (normalizedResult.photo_url) setPhotoPreview(normalizedResult.photo_url);
+          }
           const { data: tokenData, error: tokenError } = await supabase.rpc(
             'verify_top10_and_get_upload_token',
             {
@@ -478,7 +488,7 @@ export default function CheckRank({ onBack }: Props) {
                 </div>
 
                 {/* Top 10 Photo Upload */}
-                {result.is_top_10 && uploadToken && (
+                {result.is_top_10 && (
                   <div className="bg-white border border-amber-200 rounded-2xl p-6">
                     <div className="text-center mb-4">
                       <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-100 rounded-2xl mb-3">
