@@ -243,7 +243,12 @@ export default function CheckRank({ onBack }: Props) {
       setUploadSuccess(true);
       setResult((prev) => prev ? { ...prev, photo_url: photoUrl } : prev);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Failed to upload photo.');
+      const message = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+        ? String((err as { message?: unknown }).message)
+        : 'Failed to upload photo.';
+      setUploadError(message);
     } finally {
       setUploading(false);
     }
