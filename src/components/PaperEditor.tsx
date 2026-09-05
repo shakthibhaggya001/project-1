@@ -451,6 +451,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
     setSaving(true);
     setStatusMsg(null);
     try {
+      const saveErrors: string[] = [];
       let id = quizId;
       if (!id) {
         id = await createQuizAndSave();
@@ -479,7 +480,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
                 marks: q.marks,
               })
               .eq('id', q.id);
-            if (uErr) console.error('Update Q' + (i + 1) + ':', uErr.message);
+              if (uErr) saveErrors.push(`Question ${i + 1}: ${uErr.message}`);
           }
         } else {
           // Insert new
@@ -499,15 +500,20 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
             .select()
             .single();
           if (iErr) {
-            console.error('Insert Q' + (i + 1) + ':', iErr.message);
+            saveErrors.push(`Question ${i + 1}: ${iErr.message}`);
           } else if (data) {
             setQuestions((prev) => {
               const next = [...prev];
-              next[i] = { ...next[i], id: (data as Question).id, dirty: false, saved: true };
+              next[i] = { ...next[i], id: (data as unknown as Question).id, dirty: false, saved: true };
               return next;
             });
           }
         }
+      }
+
+      if (saveErrors.length > 0) {
+        setError(`Could not save the paper. ${saveErrors.join(' ')}`);
+        return;
       }
 
       // Mark all as saved

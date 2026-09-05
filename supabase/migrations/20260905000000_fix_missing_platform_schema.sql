@@ -121,6 +121,7 @@ ALTER TABLE submissions ADD COLUMN IF NOT EXISTS question_snapshot jsonb DEFAULT
 ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS motivational_banner_url text NOT NULL DEFAULT '';
 ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS motivational_quote text NOT NULL DEFAULT '';
 ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS show_motivational_banner boolean NOT NULL DEFAULT true;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS marks int NOT NULL DEFAULT 1;
 
 CREATE INDEX IF NOT EXISTS idx_questions_quiz_id ON questions(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_questions_quiz_id_qnum ON questions(quiz_id, question_number);
