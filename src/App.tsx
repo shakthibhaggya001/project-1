@@ -33,17 +33,7 @@ function AppContent() {
       return <AdminLogin />;
     }
     if (!isAdmin) {
-      return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
-          <div className="max-w-md">
-            <h1 className="text-2xl font-bold text-slate-900">Admin access required</h1>
-            <p className="mt-2 text-slate-600">This account is not authorized to manage the quiz platform.</p>
-            <button onClick={signOut} className="mt-6 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white">
-              Sign out
-            </button>
-          </div>
-        </div>
-      );
+      return <AdminLogin />;
     }
     if (route === 'create-quiz') {
       return <PaperEditor quiz={null} mode="create" onBack={() => setRoute('admin')} onSaved={() => setRoute('admin')} />;
