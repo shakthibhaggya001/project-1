@@ -985,32 +985,39 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
                   placeholder={`Question ${q.question_number} text...`}
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {(['A', 'B', 'C', 'D'] as const).map((letter) => (
-                    <div key={letter} className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => updateQuestion(idx, 'correct_answer', letter)}
-                        className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition ${
-                          q.correct_answer === letter
-                            ? 'bg-green-500 text-white'
-                            : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                        }`}
-                        title="Mark as correct answer"
-                      >
-                        {letter}
-                      </button>
-                      <input
-                        type="text"
-                        value={q[`option_${letter.toLowerCase()}` as keyof QuestionDraft] as string}
-                        onChange={(e) => {
-                          const optionField = `option_${letter.toLowerCase()}` as 'option_a' | 'option_b' | 'option_c' | 'option_d';
-                          updateQuestion(idx, optionField, e.target.value);
-                        }}
-                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder={`Option ${letter}`}
-                      />
-                    </div>
-                  ))}
+                  {(['A', 'B', 'C', 'D'] as const).map((letter) => {
+                    const optionFieldMap = {
+                      A: 'option_a',
+                      B: 'option_b',
+                      C: 'option_c',
+                      D: 'option_d',
+                    } as const;
+                    const optionField = optionFieldMap[letter];
+
+                    return (
+                      <div key={letter} className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateQuestion(idx, 'correct_answer', letter)}
+                          className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition ${
+                            q.correct_answer === letter
+                              ? 'bg-green-500 text-white'
+                              : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                          }`}
+                          title="Mark as correct answer"
+                        >
+                          {letter}
+                        </button>
+                        <input
+                          type="text"
+                          value={q[optionField] as string}
+                          onChange={(e) => updateQuestion(idx, optionField, e.target.value)}
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder={`Option ${letter}`}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="flex items-center justify-between mt-3">
                   <p className="text-xs text-slate-400">
