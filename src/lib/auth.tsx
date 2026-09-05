@@ -6,6 +6,7 @@ type AuthContextType = {
   session: Session | null;
   isAdmin: boolean;
   refreshAdmin: () => Promise<boolean>;
+  claimAdminAccess: (code: string) => Promise<string | null>;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -23,6 +24,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const authorized = data === true;
     setIsAdmin(authorized);
     return authorized;
+  };
+
+  const claimAdminAccess = async (code: string) => {
+    const { data, error } = await supabase.rpc('claim_admin_access', { p_code: code });
+    if (error) return error.message;
+    if (!(data as { ok?: boolean } | null)?.ok) {
+      return (data as { error?: string } | null)?.error || 'Invalid admin access code.';
+    }
+    setIsAdmin(true);
+    return null;
   };
   const [loading, setLoading] = useState(true);
 
@@ -94,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, isAdmin, refreshAdmin, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ session, isAdmin, refreshAdmin, claimAdminAccess, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

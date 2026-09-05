@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
 import { Brain, Eye, EyeOff, Lock, Mail, Loader2, UserPlus, KeyRound } from 'lucide-react';
 
 export default function AdminLogin() {
-  const { signIn, signUp, signOut } = useAuth();
+  const { signIn, signUp, signOut, claimAdminAccess } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,16 +29,12 @@ export default function AdminLogin() {
       if (error) {
         setError(error);
       } else {
-        const { data, error: codeError } = await supabase.rpc('claim_admin_access', {
-          p_code: accessCode.trim(),
-        });
-        if (codeError || !(data as { ok?: boolean } | null)?.ok) {
+        const codeError = await claimAdminAccess(accessCode.trim());
+        if (codeError) {
           await signOut();
-          setError(codeError?.message || 'Invalid admin access code.');
+          setError(codeError);
         } else {
-          // Reload so AuthProvider reads the newly persisted admin_users row.
-          window.location.reload();
-          return;
+          setInfo('Admin access granted.');
         }
       }
     } else {
