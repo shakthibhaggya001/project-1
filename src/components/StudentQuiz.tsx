@@ -296,7 +296,7 @@ export default function StudentQuiz({ onBack }: Props) {
 
     const { data: existingRows, error: existingError } = await supabase
       .from('submissions')
-      .select('id, status, answers, attempt_started_at, started_at, whatsapp_number, normalized_whatsapp, time_extension_until, student_name')
+      .select('id, answers, started_at, submitted_at, whatsapp_number, student_name')
       .eq('quiz_id', selectedQuiz!.id);
 
     if (existingError) {
@@ -308,35 +308,13 @@ export default function StudentQuiz({ onBack }: Props) {
 
     const existingSubmission = (existingRows || []).find((row) => {
       const rowPhone = normalizePhone(String(row.whatsapp_number || ''));
-      const rowNormalized = normalizePhone(String(row.normalized_whatsapp || ''));
-      const samePhone = rowPhone === normalizedPhone || rowNormalized === normalizedPhone;
+      const samePhone = rowPhone === normalizedPhone;
       const sameName = String(row.student_name || '').trim().toLowerCase() === studentName.trim().toLowerCase();
       return samePhone || (sameName && rowPhone.length >= 8);
     });
 
     if (existingSubmission) {
-      const status = String(existingSubmission.status || '').toLowerCase();
-      if (status === 'submitted') {
-        return { error: 'already_submitted', message: 'You have already attempted this examination.' };
-      }
-      if (status === 'expired') {
-        return { error: 'expired', message: 'This examination attempt has expired.' };
-      }
-      if (status === 'in_progress' || status === 'interrupted') {
-        return {
-          ok: true,
-          action: 'resume',
-          submission_id: existingSubmission.id,
-          student_id: undefined,
-          server_time: new Date().toISOString(),
-          start_time: selectedQuiz!.start_time,
-          end_time: selectedQuiz!.end_time,
-          effective_end_time: existingSubmission.time_extension_until || selectedQuiz!.end_time,
-          attempt_started_at: existingSubmission.attempt_started_at || existingSubmission.started_at,
-          saved_answers: existingSubmission.answers || {},
-          message: 'Resuming your previous attempt.',
-        };
-      }
+      return { error: 'already_submitted', message: 'You have already attempted this examination.' };
     }
 
     const { data: inserted, error: insertError } = await supabase
@@ -350,11 +328,8 @@ export default function StudentQuiz({ onBack }: Props) {
         answers: {},
         started_at: new Date().toISOString(),
         submitted_at: new Date().toISOString(),
-        status: 'in_progress',
-        attempt_started_at: new Date().toISOString(),
-        last_activity_at: new Date().toISOString(),
       })
-      .select('id, attempt_started_at, started_at')
+      .select('id, started_at')
       .single();
 
     if (insertError || !inserted?.id) {
@@ -373,7 +348,7 @@ export default function StudentQuiz({ onBack }: Props) {
       start_time: selectedQuiz!.start_time,
       end_time: selectedQuiz!.end_time,
       effective_end_time: selectedQuiz!.end_time,
-      attempt_started_at: inserted.attempt_started_at || inserted.started_at,
+      attempt_started_at: inserted.started_at,
       message: 'Exam started.',
     };
   };
