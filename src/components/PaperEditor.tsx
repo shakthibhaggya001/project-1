@@ -26,7 +26,6 @@ type QuestionDraft = {
   option_c: string;
   option_d: string;
   correct_answer: 'A' | 'B' | 'C' | 'D';
-  marks: number;
   dirty: boolean;
   saving?: boolean;
   saved?: boolean;
@@ -47,7 +46,6 @@ const emptyQuestion = (num: number): QuestionDraft => ({
   option_c: '',
   option_d: '',
   correct_answer: 'A',
-  marks: 1,
   dirty: false,
 });
 
@@ -228,7 +226,6 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         option_c: q.option_c,
         option_d: q.option_d,
         correct_answer: q.correct_answer,
-        marks: 1,
         dirty: false,
         saved: true,
       }));
@@ -298,7 +295,6 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         option_c: q.option_c.trim(),
         option_d: q.option_d.trim(),
         correct_answer: q.correct_answer,
-        marks: q.marks,
       })
       .eq('id', q.id);
 
@@ -477,7 +473,6 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
                 option_c: q.option_c.trim(),
                 option_d: q.option_d.trim(),
                 correct_answer: q.correct_answer,
-                marks: q.marks,
               })
               .eq('id', q.id);
               if (uErr) saveErrors.push(`Question ${i + 1}: ${uErr.message}`);
@@ -495,7 +490,6 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
               option_c: q.option_c.trim(),
               option_d: q.option_d.trim(),
               correct_answer: q.correct_answer,
-              marks: q.marks,
             })
             .select()
             .single();
@@ -549,7 +543,6 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         option_c: q.option_c.trim(),
         option_d: q.option_d.trim(),
         correct_answer: q.correct_answer,
-        marks: q.marks,
       })
       .select()
       .single();
