@@ -10,6 +10,7 @@ AS $$
 DECLARE
   total_participants int;
   top_score int;
+  question_count int;
 BEGIN
   IF NOT public.is_admin() THEN
     RETURN jsonb_build_object('error', 'Admin access required');
@@ -17,6 +18,18 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM quizzes WHERE id = p_quiz_id) THEN
     RETURN jsonb_build_object('error', 'Quiz not found');
+  END IF;
+
+  SELECT count(*)::int
+  INTO question_count
+  FROM questions
+  WHERE quiz_id = p_quiz_id;
+
+  IF question_count <> 40 THEN
+    RETURN jsonb_build_object(
+      'error', format('Cannot generate results: this paper has %s answer-key questions, but 40 are required.', question_count),
+      'question_count', question_count
+    );
   END IF;
 
   WITH scored AS (
@@ -67,6 +80,7 @@ BEGIN
   RETURN jsonb_build_object(
     'total_participants', total_participants,
     'top_score', top_score,
+    'total_questions', question_count,
     'quiz_id', p_quiz_id
   );
 END;
