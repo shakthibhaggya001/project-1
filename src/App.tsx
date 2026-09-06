@@ -9,11 +9,10 @@ import CheckRank from '@/components/CheckRank';
 import SiteSettings from '@/components/SiteSettings';
 import StudentLoginForm from '@/components/StudentLoginForm';
 import AdminAttemptsView from '@/components/AdminAttemptsView';
-import ExamAttemptStarted from '@/components/ExamAttemptStarted';
 import { SiteSettingsProvider, useSiteSettings } from '@/lib/siteSettings';
 import { Loader2 } from 'lucide-react';
-import type { Quiz } from '@/lib/supabase';
-import type { Exam, ExamAttempt } from '@/types';
+import type { Quiz, Submission } from '@/lib/supabase';
+import type { StudentEntry } from '@/types';
 
 type Route = 'home' | 'take-quiz' | 'student-login' | 'attempt-started' | 'check-rank' | 'admin' | 'admin-attempts' | 'create-quiz' | 'edit-paper' | 'site-settings';
 
@@ -26,8 +25,9 @@ function AppContent() {
     return 'home';
   });
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
-  const [startedAttempt, setStartedAttempt] = useState<ExamAttempt | null>(null);
-  const [startedExam, setStartedExam] = useState<Exam | null>(null);
+  const [startedSubmission, setStartedSubmission] = useState<Submission | null>(null);
+  const [startedQuiz, setStartedQuiz] = useState<Quiz | null>(null);
+  const [studentEntry, setStudentEntry] = useState<StudentEntry | null>(null);
 
   if (loading || settingsLoading) {
     return (
@@ -38,8 +38,7 @@ function AppContent() {
   }
 
   if (route === 'admin-attempts') return <AdminAttemptsView onBack={() => setRoute('home')} />;
-  if (route === 'student-login') return <StudentLoginForm onBack={() => setRoute('home')} onStarted={(attempt, exam) => { setStartedAttempt(attempt); setStartedExam(exam); setRoute('attempt-started'); }} />;
-  if (route === 'attempt-started' && startedAttempt && startedExam) return <ExamAttemptStarted attempt={startedAttempt} exam={startedExam} onBack={() => setRoute('home')} />;
+  if (route === 'student-login') return <StudentLoginForm onBack={() => setRoute('home')} onStarted={(submission, quiz, entry) => { setStartedSubmission(submission); setStartedQuiz(quiz); setStudentEntry(entry); setRoute('take-quiz'); }} />;
 
   // Admin routes require auth
   if (route === 'admin' || route === 'create-quiz' || route === 'edit-paper' || route === 'site-settings') {
@@ -75,7 +74,7 @@ function AppContent() {
   }
 
   if (route === 'take-quiz') {
-    return <StudentQuiz onBack={() => setRoute('home')} />;
+    return <StudentQuiz onBack={() => setRoute('home')} initialQuiz={startedQuiz} initialSubmission={startedSubmission} initialStudentEntry={studentEntry} />;
   }
 
   if (route === 'check-rank') {

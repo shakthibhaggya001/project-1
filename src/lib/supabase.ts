@@ -69,6 +69,9 @@ export type Submission = {
   time_extension_granted_by: string;
   time_extension_granted_at: string | null;
   time_extension_reason: string;
+  ip_address: string | null;
+  device_fingerprint: string | null;
+  students?: { full_name: string; gmail: string; whatsapp_number: string; school: string } | null;
 };
 
 export type Student = {

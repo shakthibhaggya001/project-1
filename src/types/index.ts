@@ -1,29 +1,18 @@
 export interface Student {
   id: string;
+  full_name: string;
   gmail: string;
-  student_name: string;
   whatsapp_number: string;
+  normalized_whatsapp: string;
   school: string;
+  grade: number | null;
   created_at: string;
+  updated_at: string;
 }
 
-export interface Exam {
-  id: string;
-  exam_name: string;
-  is_active: boolean;
-  starts_at: string;
-  ends_at: string;
-  created_at: string;
-}
-
-export interface ExamAttempt {
-  id: string;
-  student_id: string;
-  exam_id: string;
-  ip_address: string | null;
-  device_fingerprint: string | null;
-  started_at: string;
-  submitted_at: string | null;
-  score: number | null;
-  students?: Pick<Student, 'student_name' | 'gmail' | 'whatsapp_number' | 'school'> | null;
+export interface StudentEntry {
+  gmail: string;
+  fullName: string;
+  whatsapp: string;
+  school: string;
 }

@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase, type Quiz, type PublicQuestion } from '@/lib/supabase';
+import type { Submission } from '@/lib/supabase';
+import type { StudentEntry } from '@/types';
 import { getQuizStatus, formatTime, formatCountdown, formatDate, formatTimeOfDay, isAccessible, isEnglishText, normalizePhone } from '@/lib/utils';
 import {
   Brain,
@@ -23,6 +25,9 @@ const PER_QUESTION_TIME = 60; // 1 minute per question in seconds
 
 type Props = {
   onBack: () => void;
+  initialQuiz?: Quiz | null;
+  initialSubmission?: Submission | null;
+  initialStudentEntry?: StudentEntry | null;
 };
 
 type StartResult = {
@@ -45,22 +50,22 @@ type PublicQuestionRow = Omit<PublicQuestion, 'id' | 'quiz_id'> & {
   quiz_id: string;
 };
 
-export default function StudentQuiz({ onBack }: Props) {
+export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmission = null, initialStudentEntry = null }: Props) {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
+  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(initialQuiz);
   const [questions, setQuestions] = useState<PublicQuestion[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
 
-  const [studentName, setStudentName] = useState('');
+  const [studentName, setStudentName] = useState(initialStudentEntry?.fullName || '');
   const [studentGrade, setStudentGrade] = useState<'10' | '11' | ''>('');
-  const [schoolName, setSchoolName] = useState('');
-  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [schoolName, setSchoolName] = useState(initialStudentEntry?.school || '');
+  const [whatsappNumber, setWhatsappNumber] = useState(initialStudentEntry?.whatsapp || '');
   const [joinError, setJoinError] = useState<string | null>(null);
 
   // Phases: select → join (info form + start) → quiz → submitted (congratulations)
-  const [phase, setPhase] = useState<'select' | 'join' | 'quiz' | 'submitted'>('select');
+  const [phase, setPhase] = useState<'select' | 'join' | 'quiz' | 'submitted'>(initialQuiz ? 'join' : 'select');
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [timeLeft, setTimeLeft] = useState(QUIZ_DURATION);
   const [submitting, setSubmitting] = useState(false);
@@ -109,10 +114,23 @@ export default function StudentQuiz({ onBack }: Props) {
       .select('*')
       .order('start_time', { ascending: false })
       .then(({ data, error }) => {
-        if (!error && data) setQuizzes(data as Quiz[]);
+        if (!error && data) {
+          const loadedQuizzes = data as Quiz[];
+          setQuizzes(loadedQuizzes);
+          if (initialQuiz && loadedQuizzes.some((quiz) => quiz.id === initialQuiz.id)) {
+            setSelectedQuiz(initialQuiz);
+            setPhase('join');
+          }
+        }
         setLoading(false);
       });
-  }, []);
+  }, [initialQuiz]);
+
+  useEffect(() => {
+    if (!initialSubmission) return;
+    submissionIdRef.current = initialSubmission.id;
+    startedAtRef.current = initialSubmission.started_at;
+  }, [initialSubmission]);
 
   // Fetch questions when quiz selected
   useEffect(() => {
