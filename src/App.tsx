@@ -7,17 +7,27 @@ import PaperEditor from '@/components/PaperEditor';
 import StudentQuiz from '@/components/StudentQuiz';
 import CheckRank from '@/components/CheckRank';
 import SiteSettings from '@/components/SiteSettings';
+import StudentLoginForm from '@/components/StudentLoginForm';
+import AdminAttemptsView from '@/components/AdminAttemptsView';
+import ExamAttemptStarted from '@/components/ExamAttemptStarted';
 import { SiteSettingsProvider, useSiteSettings } from '@/lib/siteSettings';
 import { Loader2 } from 'lucide-react';
 import type { Quiz } from '@/lib/supabase';
+import type { Exam, ExamAttempt } from '@/types';
 
-type Route = 'home' | 'take-quiz' | 'check-rank' | 'admin' | 'create-quiz' | 'edit-paper' | 'site-settings';
+type Route = 'home' | 'take-quiz' | 'student-login' | 'attempt-started' | 'check-rank' | 'admin' | 'admin-attempts' | 'create-quiz' | 'edit-paper' | 'site-settings';
 
 function AppContent() {
   const { session, isAdmin, loading, signOut } = useAuth();
   const { loading: settingsLoading } = useSiteSettings();
-  const [route, setRoute] = useState<Route>('home');
+  const [route, setRoute] = useState<Route>(() => {
+    if (window.location.pathname === '/admin') return 'admin-attempts';
+    if (window.location.pathname === '/student-login') return 'student-login';
+    return 'home';
+  });
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
+  const [startedAttempt, setStartedAttempt] = useState<ExamAttempt | null>(null);
+  const [startedExam, setStartedExam] = useState<Exam | null>(null);
 
   if (loading || settingsLoading) {
     return (
@@ -26,6 +36,10 @@ function AppContent() {
       </div>
     );
   }
+
+  if (route === 'admin-attempts') return <AdminAttemptsView onBack={() => setRoute('home')} />;
+  if (route === 'student-login') return <StudentLoginForm onBack={() => setRoute('home')} onStarted={(attempt, exam) => { setStartedAttempt(attempt); setStartedExam(exam); setRoute('attempt-started'); }} />;
+  if (route === 'attempt-started' && startedAttempt && startedExam) return <ExamAttemptStarted attempt={startedAttempt} exam={startedExam} onBack={() => setRoute('home')} />;
 
   // Admin routes require auth
   if (route === 'admin' || route === 'create-quiz' || route === 'edit-paper' || route === 'site-settings') {
@@ -70,7 +84,7 @@ function AppContent() {
 
   return (
     <Home
-      onTakeQuiz={() => setRoute('take-quiz')}
+      onTakeQuiz={() => setRoute('student-login')}
       onCheckRank={() => setRoute('check-rank')}
       onAdmin={() => setRoute('admin')}
     />
