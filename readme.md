@@ -1,0 +1,2 @@
+VITE_SUPABASE_ANON_KEY=sb_publishable_TUGW6kyeqKeakx3TpA8CqQ_s3wxWihR
+VITE_SUPABASE_URL=https://xhwlssinrhgzernemqod.supabase.co  
