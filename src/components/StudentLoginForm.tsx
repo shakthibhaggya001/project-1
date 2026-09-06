@@ -1,17 +1,17 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { AlertCircle, ArrowRight, Loader2, Mail, School, User, Phone } from 'lucide-react';
+import { AlertCircle, ArrowRight, Loader2, School, User, Phone } from 'lucide-react';
 import { supabase, type Quiz, type Submission } from '@/lib/supabase';
 import { handleStudentLogin } from '@/lib/studentAttempts';
 import { formatCountdown, normalizePhone } from '@/lib/utils';
+import type { StudentEntry } from '@/types';
 
 type Props = { onStarted: (submission: Submission, quiz: Quiz, entry: StudentEntry) => void; onBack: () => void };
-export type StudentEntry = { gmail: string; fullName: string; whatsapp: string; school: string };
 
 export default function StudentLoginForm({ onStarted, onBack }: Props) {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [quizId, setQuizId] = useState('');
-  const [gmail, setGmail] = useState('');
   const [name, setName] = useState('');
+  const [grade, setGrade] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [school, setSchool] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
@@ -53,9 +53,8 @@ export default function StudentLoginForm({ onStarted, onBack }: Props) {
   }, []);
 
   const validate = () => {
-    if (!gmail.trim() || !name.trim() || !whatsapp.trim() || !school.trim()) return 'All fields are required.';
+    if (!name.trim() || !grade || !whatsapp.trim() || !school.trim()) return 'All fields are required.';
     if (nameError || schoolError) return 'Please use English letters only.';
-    if (!/^[^\s@]+@gmail\.com$/i.test(gmail.trim())) return 'Please enter a valid Gmail address ending in @gmail.com.';
     const digits = whatsapp.replace(/[\s-]/g, '');
     if (!/^\d{9,12}$/.test(digits)) return 'WhatsApp number must contain 9 to 12 digits.';
     if (!quizId) return 'Please select a quiz.';
@@ -69,13 +68,13 @@ export default function StudentLoginForm({ onStarted, onBack }: Props) {
     setError(validationError);
     if (validationError) return;
     setLoading(true);
-    const result = await handleStudentLogin(gmail, name, whatsapp, school, selectedQuiz!);
+    const result = await handleStudentLogin(name, Number(grade), whatsapp, school, selectedQuiz!);
     setLoading(false);
     if ('error' in result) {
       setError(result.error);
       return;
     }
-    onStarted(result.submission, result.quiz, { gmail: gmail.trim(), fullName: name.trim(), whatsapp: normalizePhone(whatsapp), school: school.trim() });
+    onStarted(result.submission, result.quiz, { fullName: name.trim(), grade: Number(grade) as 10 | 11, whatsapp: normalizePhone(whatsapp), school: school.trim() });
   };
 
   return (
@@ -90,10 +89,10 @@ export default function StudentLoginForm({ onStarted, onBack }: Props) {
           <label className="block text-sm font-medium">Exam<select value={quizId} onChange={(event) => setQuizId(event.target.value)} disabled={quizzesLoading} className="mt-2 w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white"><option value="">{quizzesLoading ? 'Loading exams...' : 'Select an exam'}</option>{quizzes.map((quiz) => <option key={quiz.id} value={quiz.id}>{quiz.title}</option>)}</select></label>
           {selectedQuiz && quizIsWaiting && <div className="rounded-xl border border-amber-300/30 bg-amber-950/30 p-3 text-sm text-amber-100"><p className="font-semibold">Exam has not started yet</p><p className="mt-1 font-mono text-lg">Starts in: {formatCountdown(Math.max(0, Math.ceil((startsAt - currentTime) / 1000)))}</p></div>}
           {selectedQuiz && quizHasEnded && <div className="rounded-xl border border-red-400/40 bg-red-950/40 p-3 text-sm text-red-100">This exam is no longer available.</div>}
-          <Field icon={Mail} label="Gmail" value={gmail} onChange={setGmail} type="email" />
           <Field icon={User} label="Full Name" value={name} onChange={(value) => { setName(value); setNameError(value && !isEnglishEntry(value) ? 'Please use English letters only' : null); }} error={nameError} />
-          <Field icon={Phone} label="WhatsApp Number" value={whatsapp} onChange={setWhatsapp} inputMode="numeric" />
+          <label className="block text-sm font-medium">Grade<select required value={grade} onChange={(event) => setGrade(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white"><option value="">Select grade</option><option value="10">10</option><option value="11">11</option></select></label>
           <Field icon={School} label="School Name" value={school} onChange={(value) => { setSchool(value); setSchoolError(value && !isEnglishEntry(value) ? 'Please use English letters only' : null); }} error={schoolError} />
+          <Field icon={Phone} label="WhatsApp Number" value={whatsapp} onChange={setWhatsapp} inputMode="numeric" />
           <button type="submit" disabled={loading || quizzesLoading || !canStartQuiz || !!nameError || !!schoolError} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3.5 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-600 disabled:opacity-60">{loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />} {loading ? 'Starting...' : 'Start Exam'}</button>
           {selectedQuiz && quizIsWaiting && <p className="text-center text-sm text-amber-200">Please wait until the countdown reaches zero.</p>}
         </form>
@@ -102,7 +101,7 @@ export default function StudentLoginForm({ onStarted, onBack }: Props) {
   );
 }
 
-function Field({ icon: Icon, label, value, onChange, type = 'text', inputMode, error }: { icon: typeof Mail; label: string; value: string; onChange: (value: string) => void; type?: string; inputMode?: 'numeric'; error?: string | null }) {
+function Field({ icon: Icon, label, value, onChange, type = 'text', inputMode, error }: { icon: typeof User; label: string; value: string; onChange: (value: string) => void; type?: string; inputMode?: 'numeric'; error?: string | null }) {
   return <label className="block text-sm font-medium">{label}<span className="relative mt-2 block"><Icon className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><input required type={type} inputMode={inputMode} value={value} onChange={(event) => onChange(event.target.value)} className={`w-full rounded-xl border bg-slate-900 py-3 pl-10 pr-4 text-white outline-none focus:border-blue-400 ${error ? 'border-red-400' : 'border-white/10'}`} /></span>{error && <span className="mt-1 block text-sm font-normal text-red-300">{error}</span>}</label>;
 }
 

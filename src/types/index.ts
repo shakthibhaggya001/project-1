@@ -11,8 +11,8 @@ export interface Student {
 }
 
 export interface StudentEntry {
-  gmail: string;
   fullName: string;
+  grade: 10 | 11;
   whatsapp: string;
   school: string;
 }

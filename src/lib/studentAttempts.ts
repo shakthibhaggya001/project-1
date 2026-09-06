@@ -5,8 +5,7 @@ import { normalizePhone } from '@/lib/utils';
 import type { Quiz, Submission } from '@/lib/supabase';
 import type { Student } from '@/types';
 
-export const DUPLICATE_GMAIL_ERROR = 'This Gmail is already registered with different details. Please enter your original registration details exactly.';
-export const DUPLICATE_WHATSAPP_ERROR = 'This WhatsApp number is already registered under a different account.';
+export const DUPLICATE_DETAILS_ERROR = 'This WhatsApp number is already registered with different details (name, grade, or school). Please enter your original registration details exactly.';
 export const DUPLICATE_ATTEMPT_ERROR = 'You have already attempted this exam. Multiple attempts are not allowed.';
 
 type LoginResult = { student: Student; submission: Submission; quiz: Quiz } | { error: string };
@@ -21,48 +20,39 @@ const normalizeStudentWhatsapp = (value: string) => {
 };
 
 export async function handleStudentLogin(
-  gmail: string,
   fullName: string,
+  grade: number,
   whatsapp: string,
   school: string,
   quiz: Quiz,
 ): Promise<LoginResult> {
-  const normalizedGmail = gmail.trim();
   const normalizedName = fullName.trim();
   const normalizedWhatsapp = normalizeStudentWhatsapp(whatsapp);
   const normalizedSchool = school.trim();
 
   try {
-    const { data: gmailRow, error: gmailError } = await supabase
+    const { data: whatsappRow, error: whatsappError } = await supabase
       .from('students')
       .select('*')
-      .eq('gmail', normalizedGmail)
+      .eq('normalized_whatsapp', normalizedWhatsapp)
       .maybeSingle();
-    if (gmailError) return { error: gmailError.message };
+    if (whatsappError) return { error: whatsappError.message };
 
     let student: Student;
-    if (gmailRow) {
-      const existing = gmailRow as Student;
+    if (whatsappRow) {
+      const existing = whatsappRow as Student;
       if (!sameIdentityText(existing.full_name, normalizedName)
-        || (normalizeStudentWhatsapp(existing.normalized_whatsapp || existing.whatsapp_number) !== normalizedWhatsapp)
+        || existing.grade !== grade
         || !sameIdentityText(existing.school, normalizedSchool)) {
-        return { error: DUPLICATE_GMAIL_ERROR };
+        return { error: DUPLICATE_DETAILS_ERROR };
       }
       student = existing;
     } else {
-      const { data: whatsappRow, error: whatsappError } = await supabase
-        .from('students')
-        .select('*')
-        .or(`normalized_whatsapp.eq.${normalizedWhatsapp},whatsapp_number.eq.${normalizedWhatsapp}`)
-        .maybeSingle();
-      if (whatsappError) return { error: whatsappError.message };
-      if (whatsappRow) return { error: DUPLICATE_WHATSAPP_ERROR };
-
       const { data: insertedStudent, error: insertError } = await supabase
         .from('students')
         .insert({
-          gmail: normalizedGmail,
           full_name: normalizedName,
+          grade,
           whatsapp_number: normalizedWhatsapp,
           normalized_whatsapp: normalizedWhatsapp,
           school: normalizedSchool,
@@ -70,10 +60,7 @@ export async function handleStudentLogin(
         .select('*')
         .single();
       if (insertError) {
-        if (isUniqueViolation(insertError)) {
-          const { data: gmailConflict } = await supabase.from('students').select('id').eq('gmail', normalizedGmail).maybeSingle();
-          return { error: gmailConflict ? DUPLICATE_GMAIL_ERROR : DUPLICATE_WHATSAPP_ERROR };
-        }
+        if (isUniqueViolation(insertError)) return { error: DUPLICATE_DETAILS_ERROR };
         return { error: insertError.message };
       }
       student = insertedStudent as Student;
