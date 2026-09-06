@@ -98,79 +98,74 @@ const parseAnswerKeyText = (raw: string): Partial<Record<number, AnswerOption>> 
 };
 
 const parseBulkQuestionText = (raw: string): QuestionDraft[] => {
+  // Accept both real newlines and literal "\n"/"\r" sequences that survive some pastes.
   const cleaned = raw.replace(/\\r/g, '\r').replace(/\\n/g, '\n').replace(/\r/g, '').trim();
   if (!cleaned) return [];
 
-  const rawBlocks = cleaned
-    .split(/\n\s*\n+/)
-    .map((block) => block.trim())
+  // Parse line-by-line and rely on the question-number / option-letter prefixes
+  // instead of blank-line separators, so the import works whether or not the
+  // paste preserves blank lines between questions.
+  const lines = cleaned
+    .split('\n')
+    .map((line) => line.trim())
     .filter(Boolean);
 
-  const blocks = rawBlocks.length > 1 ? rawBlocks : cleaned.split(/\n(?=(?:\s*(?:Q(?:uestion)?\s*)?\d+|\s*[A-D][.)]))/i);
-
   const parsedQuestions: QuestionDraft[] = [];
+  let current: { text: string; options: Partial<Record<AnswerOption, string>> } | null = null;
 
-  const flushQuestion = (questionText: string, optionMap: Partial<Record<AnswerOption, string>>) => {
-    const cleanedText = questionText.replace(/^(?:Q(?:uestion)?\s*)?\d+[.)]\s*/i, '').trim();
-    const normalizedText = cleanedText.replace(/\s+/g, ' ');
-    const options = { A: optionMap.A || '', B: optionMap.B || '', C: optionMap.C || '', D: optionMap.D || '' };
+  const flushQuestion = () => {
+    if (!current) return;
+    const normalizedText = current.text
+      .replace(/^(?:Q(?:uestion)?\s*)?\d+[.)]\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const options = {
+      A: current.options.A || '',
+      B: current.options.B || '',
+      C: current.options.C || '',
+      D: current.options.D || '',
+    };
     const hasValidOptions = Object.values(options).every((value) => value.trim().length > 0);
 
-    if (!normalizedText || !hasValidOptions) return;
+    if (normalizedText && hasValidOptions) {
+      const nextQuestion = emptyQuestion(parsedQuestions.length + 1);
+      nextQuestion.question_text = normalizedText;
+      nextQuestion.option_a = options.A.trim();
+      nextQuestion.option_b = options.B.trim();
+      nextQuestion.option_c = options.C.trim();
+      nextQuestion.option_d = options.D.trim();
+      nextQuestion.correct_answer = 'A';
+      parsedQuestions.push(nextQuestion);
+    }
 
-    const nextQuestion = emptyQuestion(parsedQuestions.length + 1);
-    nextQuestion.question_text = normalizedText;
-    nextQuestion.option_a = options.A.trim();
-    nextQuestion.option_b = options.B.trim();
-    nextQuestion.option_c = options.C.trim();
-    nextQuestion.option_d = options.D.trim();
-    nextQuestion.correct_answer = 'A';
-    parsedQuestions.push(nextQuestion);
+    current = null;
   };
 
-  blocks.forEach((block) => {
-    const lines = block
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
+  lines.forEach((line) => {
+    const optionMatch = line.match(/^([A-D])\s*[.)]\s*(.+)$/i);
+    const questionMatch = line.match(/^(?:Q(?:uestion)?\s*)?(\d+)[.)]\s*(.+)$/i);
 
-    if (lines.length === 0) return;
+    // An option line only counts once a question is open; otherwise a stem that
+    // happens to start with "A." would be swallowed.
+    if (optionMatch && current) {
+      current.options[optionMatch[1].toUpperCase() as AnswerOption] = optionMatch[2].trim();
+      return;
+    }
 
-    const optionMap: Partial<Record<AnswerOption, string>> = {};
-    let questionText = '';
+    if (questionMatch) {
+      flushQuestion();
+      current = { text: questionMatch[2].trim(), options: {} };
+      return;
+    }
 
-    lines.forEach((line) => {
-      const labeledOptionMatch = line.match(/^([A-D])\s*[.)]\s*(.+)$/i);
-      if (labeledOptionMatch) {
-        const letter = labeledOptionMatch[1].toUpperCase() as AnswerOption;
-        optionMap[letter] = labeledOptionMatch[2].trim();
-        return;
-      }
-
-      const plainQuestionMatch = line.match(/^(?:Q(?:uestion)?\s*)?(?:\d+[.)]|[A-D][.)])?\s*(.+)$/i);
-      if (plainQuestionMatch && !line.match(/^[A-D]\s*[.)]/i)) {
-        const value = plainQuestionMatch[1]?.trim() || '';
-        if (questionText) {
-          flushQuestion(questionText, optionMap);
-          questionText = value;
-          Object.keys(optionMap).forEach((key) => delete optionMap[key as AnswerOption]);
-        } else {
-          questionText = value;
-        }
-        return;
-      }
-
-      if (!questionText) {
-        questionText = line.replace(/^(?:Q(?:uestion)?\s*)?\d+[.)]\s*/i, '').trim();
-      } else if (!Object.keys(optionMap).length) {
-        questionText = `${questionText} ${line}`.trim();
-      }
-    });
-
-    if (questionText) {
-      flushQuestion(questionText, optionMap);
+    // Continuation of the current question stem (multi-line question text),
+    // but only before any options have been read.
+    if (current && Object.keys(current.options).length === 0) {
+      current.text = `${current.text} ${line}`.trim();
     }
   });
+
+  flushQuestion();
 
   return parsedQuestions;
 };
@@ -380,6 +375,14 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
     }
 
     setBulkImportText('');
+
+    // Surface the parsed count so a partial import (e.g. a paste that lost some
+    // questions) is never silent.
+    setStatusMsg(
+      imported.length === TARGET_QUESTIONS
+        ? `Imported all ${imported.length} questions.`
+        : `Imported ${imported.length} question(s). Expected ${TARGET_QUESTIONS} — check the pasted text for any question missing one of its A–D options.`
+    );
   };
 
   const applyAnswerKey = () => {
@@ -393,8 +396,10 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
     setQuestions((prev) =>
       prev.map((question, index) => {
         const key = parsedKey[index + 1];
-        if (!key) return question;
-        return { ...question, correct_answer: key };
+        if (!key || question.correct_answer === key) return question;
+        // Mark dirty so the change is actually persisted on save (existing
+        // questions are only written when q.dirty is true).
+        return { ...question, correct_answer: key, dirty: true, saved: false };
       })
     );
   };
@@ -454,6 +459,15 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         if (importedQuestions.length === 0) {
           setError('Could not read the pasted questions. Use question numbers and A, B, C, and D options.');
           return;
+        }
+        // Apply the pasted answer key here too, otherwise saving straight from a
+        // bulk paste would store every correct answer as the default "A".
+        if (answerKeyText.trim()) {
+          const parsedKey = parseAnswerKeyText(answerKeyText);
+          importedQuestions.forEach((question, index) => {
+            const key = parsedKey[index + 1];
+            if (key) question.correct_answer = key;
+          });
         }
         questionsToSave = importedQuestions;
         setQuestions(importedQuestions);
