@@ -375,7 +375,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
       setQuestions((prev) => prev.map((question, index) => {
         const key = parsedKey[index + 1];
         if (!key) return question;
-        return { ...question, correct_answer: key };
+        return { ...question, correct_answer: key, dirty: true, saved: false };
       }));
     }
 
@@ -806,7 +806,17 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
             <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-medium">Students are currently taking this examination.</p>
-              <p className="text-amber-700 mt-0.5">Changing questions may affect active attempts. Existing submissions are protected by question snapshots.</p>
+              <p className="text-amber-700 mt-0.5">Changing questions or answers may affect active attempts. Save only verified corrections while the exam is live.</p>
+            </div>
+          </div>
+        )}
+
+        {!isLive && liveAttemptCount > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-blue-800 text-sm mb-4 flex items-start gap-2">
+            <FileCheck className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">This paper has submitted attempts.</p>
+              <p className="text-blue-700 mt-0.5">After correcting the answer key, save the paper, then use Regenerate Results in the dashboard to recalculate scores and rankings.</p>
             </div>
           </div>
         )}
@@ -897,7 +907,13 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
                             const targetIndex = next.findIndex((q) => q.question_number === questionNumber);
                             const safeIndex = targetIndex >= 0 ? targetIndex : Math.min(index, next.length);
                             if (safeIndex >= 0 && next[safeIndex]) {
-                              next[safeIndex] = { ...next[safeIndex], question_number: questionNumber, correct_answer: option };
+                              next[safeIndex] = {
+                                ...next[safeIndex],
+                                question_number: questionNumber,
+                                correct_answer: option,
+                                dirty: true,
+                                saved: false,
+                              };
                             } else {
                               next.push({ ...emptyQuestion(questionNumber), question_number: questionNumber, correct_answer: option });
                             }
