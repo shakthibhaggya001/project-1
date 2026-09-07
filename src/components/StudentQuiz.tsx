@@ -81,6 +81,9 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
   // Attempt tracking
   const submissionIdRef = useRef<string>('');
   const startedAtRef = useRef<string>('');
+  // Guards against a slow/older questions request resolving *after* a newer
+  // one and clobbering the correct question list with stale data.
+  const questionsRequestIdRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const submittedRef = useRef(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -132,12 +135,17 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
     startedAtRef.current = initialSubmission.started_at;
   }, [initialSubmission]);
 
-  // Fetch questions when quiz selected
+  // Preview-fetch questions when a quiz is selected (used only to show the
+  // question count on the join screen). Guarded with a request id so this
+  // fetch can never overwrite the authoritative list loaded in
+  // handleStartNow if it happens to resolve later.
   useEffect(() => {
     if (!selectedQuiz) return;
+    const requestId = ++questionsRequestIdRef.current;
     setQuestionsLoading(true);
     setQuestionsError(null);
     loadExamQuestions(selectedQuiz.id).then(({ data, error }) => {
+        if (requestId !== questionsRequestIdRef.current) return; // stale, ignore
         if (error) {
           setQuestions([]);
           setQuestionsError(error.message);
@@ -411,10 +419,20 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
       }
 
       // Reload after the attempt is created so the exam never opens with a
-      // stale or empty question list from the selection screen.
+      // stale or empty question list from the selection screen. Bump the
+      // request id first so this authoritative load always "wins" over any
+      // in-flight preview fetch from the join screen, no matter which
+      // resolves first.
+      const requestId = ++questionsRequestIdRef.current;
       setQuestionsLoading(true);
       setQuestionsError(null);
       const { data: questionRows, error: questionError } = await loadExamQuestions(selectedQuiz.id);
+
+      if (requestId !== questionsRequestIdRef.current) {
+        // An even newer request started while this one was in flight
+        // (e.g. user clicked Start again) — let that one own the state.
+        return;
+      }
 
       if (questionError) {
         setQuestions([]);
