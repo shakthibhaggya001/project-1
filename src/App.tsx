@@ -37,6 +37,8 @@ function AppContent() {
     );
   }
 
+  if (route === 'student-login') return <StudentLoginForm onBack={() => setRoute('home')} onStarted={(submission, quiz, entry) => { setStartedSubmission(submission); setStartedQuiz(quiz); setStudentEntry(entry); setRoute('take-quiz'); }} />;
+
   // Admin routes require auth — including admin-attempts, which exposes
   // student PII (names, WhatsApp numbers, IP addresses, device
   // fingerprints) and must never render before an authenticated admin
