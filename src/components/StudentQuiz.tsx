@@ -194,16 +194,31 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
     };
   }, [phase, selectedQuiz]);
 
-  // Progressive answer saving (every 5 seconds while quiz is active)
+  // Progressive answer saving (every 5 seconds while quiz is active).
+  // Also doubles as an early-warning check: if the server has marked this
+  // attempt 'expired' (e.g. the tab was backgrounded and the browser
+  // throttled the JS timer, so the client thinks time remains but the
+  // server-side deadline already passed), tell the student immediately
+  // instead of letting them keep answering toward a submission that will
+  // be silently rejected later.
   useEffect(() => {
     if (phase !== 'quiz' || !submissionIdRef.current) return;
 
     saveTimerRef.current = setInterval(async () => {
       if (submittedRef.current || !submissionIdRef.current) return;
-      await supabase.rpc('save_answer_progress', {
+      const { data } = await supabase.rpc('save_answer_progress', {
         p_submission_id: submissionIdRef.current,
         p_answers: answersRef.current,
       });
+      const result = data as { error?: string; message?: string } | null;
+      if (result?.error === 'expired' && !submittedRef.current) {
+        submittedRef.current = true;
+        if (timerRef.current) clearInterval(timerRef.current);
+        if (saveTimerRef.current) clearInterval(saveTimerRef.current);
+        setSubmitError(
+          'Your exam session has expired on the server (this can happen if the browser tab was in the background). Please contact the administrator immediately with your name and exam details — do not close this page.'
+        );
+      }
     }, 5000);
 
     return () => {
@@ -256,7 +271,7 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const { error } = await supabase.rpc('submit_exam', {
+      const { data, error } = await supabase.rpc('submit_exam', {
         p_submission_id: submissionIdRef.current,
         p_answers: answersRef.current,
       });
@@ -269,6 +284,22 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
           setSubmitting(false);
           return;
         }
+      }
+      // The RPC can return a *successful* call that still carries a
+      // server-side rejection (e.g. the exam window closed a moment
+      // before this request reached the server). Never treat that as a
+      // successful submission — the previous code ignored `data` here
+      // and showed "Congratulations!" even when the server had marked
+      // the attempt 'expired' and discarded the answers.
+      const result = data as { error?: string; message?: string } | null;
+      if (result?.error && result.error !== 'ok') {
+        submittedRef.current = false;
+        setSubmitError(
+          result.message ||
+            'Time ran out and the server could not accept your submission. Please contact the administrator immediately with your name and exam details.'
+        );
+        setSubmitting(false);
+        return;
       }
       if (saveTimerRef.current) clearInterval(saveTimerRef.current);
       setPhase('submitted');
@@ -289,7 +320,7 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const { error } = await supabase.rpc('submit_exam', {
+      const { data, error } = await supabase.rpc('submit_exam', {
         p_submission_id: submissionIdRef.current,
         p_answers: answersRef.current,
       });
@@ -302,6 +333,16 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
           setSubmitting(false);
           return;
         }
+      }
+      const result = data as { error?: string; message?: string } | null;
+      if (result?.error && result.error !== 'ok') {
+        submittedRef.current = false;
+        setSubmitError(
+          result.message ||
+            'The server could not accept your submission (your session may have expired). Please contact the administrator immediately with your name and exam details.'
+        );
+        setSubmitting(false);
+        return;
       }
       setPhase('submitted');
     } catch {
