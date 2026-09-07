@@ -37,16 +37,19 @@ function AppContent() {
     );
   }
 
-  if (route === 'admin-attempts') return <AdminAttemptsView onBack={() => setRoute('home')} />;
-  if (route === 'student-login') return <StudentLoginForm onBack={() => setRoute('home')} onStarted={(submission, quiz, entry) => { setStartedSubmission(submission); setStartedQuiz(quiz); setStudentEntry(entry); setRoute('take-quiz'); }} />;
-
-  // Admin routes require auth
-  if (route === 'admin' || route === 'create-quiz' || route === 'edit-paper' || route === 'site-settings') {
+  // Admin routes require auth — including admin-attempts, which exposes
+  // student PII (names, WhatsApp numbers, IP addresses, device
+  // fingerprints) and must never render before an authenticated admin
+  // session is confirmed.
+  if (route === 'admin' || route === 'admin-attempts' || route === 'create-quiz' || route === 'edit-paper' || route === 'site-settings') {
     if (!session) {
       return <AdminLogin />;
     }
     if (!isAdmin) {
       return <AdminLogin />;
+    }
+    if (route === 'admin-attempts') {
+      return <AdminAttemptsView onBack={() => setRoute('home')} />;
     }
     if (route === 'create-quiz') {
       return <PaperEditor quiz={null} mode="create" onBack={() => setRoute('admin')} onSaved={() => setRoute('admin')} />;
