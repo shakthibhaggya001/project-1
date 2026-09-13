@@ -467,7 +467,8 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
       });
       const payload = await res.json();
       if (!res.ok) {
-        setError(payload?.error || 'AI extraction failed.');
+        const detail = payload?.details ? `${payload.details}`.slice(0, 300) : '';
+        setError(`${payload?.error || 'AI extraction failed.'}${detail ? ` — ${detail}` : ''}`);
         return;
       }
 
