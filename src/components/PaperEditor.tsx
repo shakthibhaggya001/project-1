@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   Brain,
   FileCheck,
+  Upload,
+  Sparkles,
 } from 'lucide-react';
 
 type QuestionDraft = {
@@ -24,6 +26,7 @@ type QuestionDraft = {
   option_c: string;
   option_d: string;
   correct_answer: 'A' | 'B' | 'C' | 'D';
+  group_id?: string | null;
   dirty: boolean;
   saving?: boolean;
   saved?: boolean;
@@ -99,7 +102,15 @@ const parseAnswerKeyText = (raw: string): Partial<Record<number, AnswerOption>> 
 
 const parseBulkQuestionText = (raw: string): QuestionDraft[] => {
   // Accept both real newlines and literal "\n"/"\r" sequences that survive some pastes.
-  const cleaned = raw.replace(/\\r/g, '\r').replace(/\\n/g, '\n').replace(/\r/g, '').trim();
+  const cleaned = raw
+    .replace(/\\r/g, '\r')
+    .replace(/\\n/g, '\n')
+    .replace(/\r/g, '')
+    // Also accept the semicolon-separated single-line format shown in the
+    // on-screen instructions ("1. Question text; A. opt; B. opt; C. opt; D. opt").
+    .replace(/;\s*(?=[A-D]\s*[.)]\s)/gi, '\n')
+    .replace(/;\s*(?=(?:Q(?:uestion)?\s*)?\d+\s*[.)]\s)/gi, '\n')
+    .trim();
   if (!cleaned) return [];
 
   // Parse line-by-line and rely on the question-number / option-letter prefixes
@@ -188,6 +199,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
   const [liveAttemptCount, setLiveAttemptCount] = useState(0);
   const [quizId, setQuizId] = useState<string | null>(quiz?.id || null);
   const [bulkImportText, setBulkImportText] = useState('');
+  const [aiUploading, setAiUploading] = useState(false);
   const [answerKeyText, setAnswerKeyText] = useState('');
 
   const autosaveTimers = useRef<{ [key: number]: ReturnType<typeof setTimeout> }>({});
@@ -218,6 +230,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         option_c: q.option_c,
         option_d: q.option_d,
         correct_answer: q.correct_answer,
+        group_id: q.group_id ?? null,
         dirty: false,
         saved: true,
       }));
@@ -288,6 +301,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         option_c: q.option_c.trim(),
         option_d: q.option_d.trim(),
         correct_answer: q.correct_answer,
+        group_id: q.group_id ?? null,
       })
       .eq('id', q.id);
 
@@ -342,7 +356,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
   const applyBulkImport = () => {
     const imported = parseBulkQuestionText(bulkImportText);
     if (imported.length === 0) {
-      setError('No valid questions were detected. Paste question blocks in the format: 1. Question? A. ... B. ... C. ... D. ...');
+      setError('No valid questions were detected. Put each question and its A/B/C/D options on their own line, e.g. "1. Question?" then "A. option" on the next line.');
       return;
     }
 
@@ -402,6 +416,125 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         return { ...question, correct_answer: key, dirty: true, saved: false };
       })
     );
+  };
+
+  type AiExtractedGroup = {
+    context: string | null;
+    questions: Array<{
+      number?: number;
+      text: string;
+      options: { A: string; B: string; C: string; D: string };
+      correct_answer: 'A' | 'B' | 'C' | 'D' | null;
+    }>;
+  };
+
+  const handleAiPdfUpload = async (file: File) => {
+    setError(null);
+    setStatusMsg(null);
+
+    if (file.type !== 'application/pdf') {
+      setError('Please upload a PDF file. Export your Word/Google Doc as PDF first (File → Download → PDF).');
+      return;
+    }
+
+    setAiUploading(true);
+    try {
+      // A quiz row (with title/date/times) must exist before questions or
+      // question_groups can be attached to it.
+      let effectiveQuizId = quizId;
+      if (!effectiveQuizId) {
+        effectiveQuizId = await createQuizAndSave();
+        if (!effectiveQuizId) {
+          setAiUploading(false);
+          return;
+        }
+      }
+
+      const fileBase64: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1] || '');
+        };
+        reader.onerror = () => reject(new Error('Could not read the file.'));
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch('/api/extract-questions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ fileBase64, mediaType: 'application/pdf' }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        setError(payload?.error || 'AI extraction failed.');
+        return;
+      }
+
+      const groups: AiExtractedGroup[] = payload?.groups || [];
+      if (groups.length === 0) {
+        setError('The AI could not find any questions in this document.');
+        return;
+      }
+
+      const newDrafts: QuestionDraft[] = [];
+      let orderIndex = 0;
+      for (const group of groups) {
+        let groupId: string | null = null;
+        if (group.context && group.context.trim()) {
+          const { data, error: gErr } = await supabase
+            .from('question_groups')
+            .insert({ quiz_id: effectiveQuizId, context_content: group.context.trim(), display_order: orderIndex })
+            .select()
+            .single();
+          if (gErr) {
+            setError(`Could not save a shared table/context: ${gErr.message}`);
+            return;
+          }
+          groupId = (data as { id: string })?.id || null;
+        }
+        orderIndex += 1;
+
+        for (const q of group.questions || []) {
+          if (!q.text?.trim()) continue;
+          newDrafts.push({
+            question_number: 0,
+            question_text: q.text.trim(),
+            option_a: q.options?.A || '',
+            option_b: q.options?.B || '',
+            option_c: q.options?.C || '',
+            option_d: q.options?.D || '',
+            correct_answer: q.correct_answer || 'A',
+            group_id: groupId,
+            dirty: true,
+            saved: false,
+          });
+        }
+      }
+
+      if (newDrafts.length === 0) {
+        setError('The AI could not find any valid questions in this document.');
+        return;
+      }
+
+      setQuestions((prev) => {
+        const importedWithPositions = newDrafts.map((q, index) => ({ ...q, question_number: index + 1 }));
+        const merged = [...prev, ...importedWithPositions];
+        const deduped = merged.filter((question, index, arr) => {
+          if (!question.question_text.trim()) return false;
+          return arr.findIndex((item) => item.question_text.trim() === question.question_text.trim()) === index;
+        });
+        return deduped.slice(0, TARGET_QUESTIONS);
+      });
+
+      setStatusMsg(
+        `AI extracted ${newDrafts.length} question(s) from the PDF. Correct answers default to "A" unless the paper marked one — please review every answer with the Quick Answer Key Grid before publishing.`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process the PDF.');
+    } finally {
+      setAiUploading(false);
+    }
   };
 
   const createQuizAndSave = async (): Promise<string | null> => {
@@ -499,6 +632,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
                 option_c: q.option_c.trim(),
                 option_d: q.option_d.trim(),
                 correct_answer: q.correct_answer,
+                group_id: q.group_id ?? null,
               })
               .eq('id', q.id);
               if (uErr) saveErrors.push(`Question ${i + 1}: ${uErr.message}`);
@@ -516,6 +650,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
               option_c: q.option_c.trim(),
               option_d: q.option_d.trim(),
               correct_answer: q.correct_answer,
+              group_id: q.group_id ?? null,
             })
             .select()
             .single();
@@ -569,6 +704,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         option_c: q.option_c.trim(),
         option_d: q.option_d.trim(),
         correct_answer: q.correct_answer,
+        group_id: q.group_id ?? null,
       })
       .select()
       .single();
@@ -853,11 +989,54 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
           </div>
         ) : null}
 
+        <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm">
+          <div className="mb-3 flex items-start gap-3">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
+              <Sparkles className="h-4 w-4 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">AI Question Import (PDF)</h2>
+              <p className="text-sm text-slate-500">
+                Upload your exam paper as a PDF and Claude will read it and fill in the questions
+                below automatically — including grouping any questions that share a table
+                ("Answer questions 1–5 based on the table below"). Export Word/Google Docs as
+                PDF first (File → Download → PDF). Always double-check the extracted questions
+                and correct answers before publishing.
+              </p>
+            </div>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">
+            {aiUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {aiUploading ? 'Reading PDF…' : 'Upload PDF'}
+            <input
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              disabled={aiUploading}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleAiPdfUpload(file);
+                e.target.value = '';
+              }}
+            />
+          </label>
+        </div>
+
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Bulk Question Import</h2>
-              <p className="text-sm text-slate-500">Paste all 40 questions in this format: 1. Question text; A. option; B. option; C. option; D. option</p>
+              <p className="text-sm text-slate-500">
+                Paste your questions below. Put each question and its options on their own line,
+                for example:
+              </p>
+              <pre className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 mt-1 text-slate-600 whitespace-pre-wrap">
+{`1. Question text?
+A. option
+B. option
+C. option
+D. option`}
+              </pre>
             </div>
             <button
               type="button"
