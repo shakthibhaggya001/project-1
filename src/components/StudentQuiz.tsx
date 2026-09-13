@@ -545,6 +545,20 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
     setPhase('join');
   };
 
+  // If the student already completed registration on the separate
+  // /student-login screen (initialSubmission is set), don't make them fill
+  // in the same details again on this component's own join screen — just
+  // run the same start/resume flow automatically, once.
+  const autoStartTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (autoStartTriggeredRef.current) return;
+    if (!initialSubmission || !selectedQuiz) return;
+    if (phase !== 'join') return;
+    autoStartTriggeredRef.current = true;
+    void handleStartNow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSubmission, selectedQuiz, phase]);
+
   const answeredCount = Object.keys(answers).length;
 
   // ---- Loading ----
@@ -808,6 +822,19 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
 
   // ---- Join screen (info form + START NOW) ----
   if (phase === 'join' && selectedQuiz) {
+    if (initialSubmission) {
+      // Already registered via the /student-login screen — the auto-start
+      // effect is resuming this attempt. Show a loader instead of a second
+      // copy of the registration form.
+      return (
+        <main className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+          <div className="flex flex-col items-center gap-3 text-slate-500">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <p>Starting your exam…</p>
+          </div>
+        </main>
+      );
+    }
     const status = getQuizStatus(selectedQuiz);
 
     if (status === 'closed') {
