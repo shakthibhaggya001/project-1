@@ -3,6 +3,7 @@ import { supabase, type Quiz, type PublicQuestion } from '@/lib/supabase';
 import type { Submission } from '@/lib/supabase';
 import type { StudentEntry } from '@/types';
 import { getQuizStatus, formatTime, formatCountdown, formatDate, formatTimeOfDay, isAccessible, isEnglishText, normalizePhone } from '@/lib/utils';
+import { renderQuestionContent } from '@/lib/questionText';
 import {
   Brain,
   Clock,
@@ -775,7 +776,7 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
                   <span className="flex-shrink-0 w-10 h-10 bg-blue-100 text-blue-700 rounded-xl flex items-center justify-center text-lg font-bold">
                     {currentQuestionIndex + 1}
                   </span>
-                  <p className="text-lg text-slate-900 font-medium pt-1.5">{currentQ.question_text}</p>
+                  <p className="text-lg text-slate-900 font-medium pt-1.5">{renderQuestionContent(currentQ.question_text)}</p>
                 </div>
                 <div className="grid grid-cols-1 gap-2.5">
                   {(['A', 'B', 'C', 'D'] as const).map((letter) => {
