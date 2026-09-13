@@ -50,6 +50,68 @@ type PublicQuestionRow = Omit<PublicQuestion, 'id' | 'quiz_id'> & {
   quiz_id: string;
 };
 
+// Renders a question group's shared context (e.g. "Answer questions 1-5
+// based on the table below"). Supports simple pipe-delimited markdown
+// tables (| Year | Event |) so admins don't need to hand-write HTML;
+// anything else renders as plain paragraphs.
+function parseGroupContext(content: string) {
+  const lines = content.split('\n').map((l) => l.trim()).filter(Boolean);
+  const tableLines = lines.filter((l) => l.startsWith('|'));
+  if (tableLines.length >= 2) {
+    const rows = tableLines
+      .filter((l) => !/^\|[\s\-:|]+\|$/.test(l))
+      .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
+    return { type: 'table' as const, header: rows[0] || [], body: rows.slice(1) };
+  }
+  return { type: 'text' as const, lines };
+}
+
+function GroupContext({ content }: { content: string }) {
+  const parsed = parseGroupContext(content);
+  return (
+    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+        Reference
+      </p>
+      {parsed.type === 'table' ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr>
+                {parsed.header.map((cell, i) => (
+                  <th
+                    key={i}
+                    className="border border-slate-300 bg-slate-100 px-3 py-2 text-left font-semibold text-slate-700"
+                  >
+                    {cell}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {parsed.body.map((row, ri) => (
+                <tr key={ri}>
+                  {row.map((cell, ci) => (
+                    <td key={ci} className="border border-slate-300 px-3 py-2 text-slate-700">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="space-y-2 text-slate-700 text-sm leading-relaxed">
+          {parsed.lines.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmission = null, initialStudentEntry = null }: Props) {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +166,7 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
     // Never select correct_answer on this public fallback.
     const fallback = await supabase
       .from('questions')
-      .select('id, quiz_id, question_number, question_text, option_a, option_b, option_c, option_d')
+      .select('id, quiz_id, question_number, question_text, option_a, option_b, option_c, option_d, group_id')
       .eq('quiz_id', quizId)
       .order('question_number', { ascending: true });
     return {
@@ -698,6 +760,7 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
             </div>
           ) : currentQ ? (
             <div className="space-y-4">
+              {currentQ.group_context && <GroupContext content={currentQ.group_context} />}
               <div className="bg-white border border-slate-200 rounded-2xl p-1.5 overflow-hidden">
                 <div
                   className={`h-1.5 rounded-full transition-all duration-1000 ease-linear ${
