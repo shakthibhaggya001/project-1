@@ -31,7 +31,9 @@ export default async function handler(req: any, res: any) {
       'Preserve the original language and exact wording (including Sinhala/Tamil/English text) — never translate or paraphrase. ' +
       'Some questions share a table or passage that several consecutive questions refer to (e.g. "Answer questions 1-5 based on the table below"); ' +
       'group those together with the shared content once, instead of repeating it per question. ' +
-      'Render any shared table using simple pipe-delimited markdown, e.g. "| Year | Event |\\n| 1948 | Independence |". ' +
+      'Some individual questions (e.g. matching-pairs questions like "match column A to column B") contain their OWN table within that single question\'s text — keep that table inside that question\'s "text" field, not as a group context. ' +
+      'Whenever you render any table (shared context or embedded in a single question), use real newline characters ("\\n") between rows — never join rows on one line with "||". ' +
+      'Render tables using simple pipe-delimited markdown, e.g. "| Year | Event |\\n| 1948 | Independence |". ' +
       'Respond with ONLY valid JSON, no prose, no markdown code fences, matching exactly this shape: ' +
       '{"groups":[{"context": string|null, "questions":[{"number": number, "text": string, ' +
       '"options": {"A": string, "B": string, "C": string, "D": string}, "correct_answer": "A"|"B"|"C"|"D"|null}]}]}. ' +
