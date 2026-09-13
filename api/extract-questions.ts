@@ -64,6 +64,7 @@ export default async function handler(req: any, res: any) {
 
     if (!geminiRes.ok) {
       const details = await geminiRes.text();
+      console.error('Gemini API request failed', geminiRes.status, details);
       res.status(502).json({ error: 'AI extraction request failed.', details });
       return;
     }
@@ -86,6 +87,7 @@ export default async function handler(req: any, res: any) {
 
     res.status(200).json(parsed);
   } catch (err: any) {
+    console.error('extract-questions unexpected error', err);
     res.status(500).json({ error: err?.message || 'Unexpected server error' });
   }
 }
