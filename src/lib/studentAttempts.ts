@@ -1,17 +1,12 @@
 import { supabase } from '@/lib/supabase';
-import { getClientIp } from '@/lib/getClientIp';
-import { getDeviceId } from '@/lib/getDeviceId';
 import { normalizePhone } from '@/lib/utils';
-import type { Quiz, Submission } from '@/lib/supabase';
-import type { Student } from '@/types';
+import type { Quiz, Submission, Student } from '@/lib/supabase';
 
 export const DUPLICATE_DETAILS_ERROR = 'This WhatsApp number is already registered with different details (name, grade, or school). Please enter your original registration details exactly.';
 export const DUPLICATE_ATTEMPT_ERROR = 'You have already attempted this exam. Multiple attempts are not allowed.';
 
 type LoginResult = { student: Student; submission: Submission; quiz: Quiz } | { error: string };
 
-const sameIdentityText = (left: string, right: string) => left.trim().toLowerCase() === right.trim().toLowerCase();
-const isUniqueViolation = (error: { code?: string } | null) => error?.code === '23505';
 const normalizeStudentWhatsapp = (value: string) => {
   const digits = normalizePhone(value);
   if (digits.startsWith('94') && digits.length === 11) return `0${digits.slice(2)}`;
@@ -19,6 +14,13 @@ const normalizeStudentWhatsapp = (value: string) => {
   return digits;
 };
 
+// Uses the start_or_resume_attempt RPC (SECURITY DEFINER) instead of direct
+// table inserts. Direct .from('students')/.from('submissions').insert()
+// calls are blocked by row-level security — those tables are locked down
+// to admin-only reads/writes so that student PII and the answer key are
+// never directly exposed to anonymous clients. The RPC runs server-side
+// with elevated privileges and already implements student identity
+// lookup/creation, duplicate-attempt detection, and resume handling.
 export async function handleStudentLogin(
   fullName: string,
   grade: number,
@@ -31,71 +33,82 @@ export async function handleStudentLogin(
   const normalizedSchool = school.trim();
 
   try {
-    const { data: whatsappRow, error: whatsappError } = await supabase
-      .from('students')
-      .select('*')
-      .eq('normalized_whatsapp', normalizedWhatsapp)
-      .maybeSingle();
-    if (whatsappError) return { error: whatsappError.message };
+    const { data, error } = await supabase.rpc('start_or_resume_attempt', {
+      p_quiz_id: quiz.id,
+      p_student_name: normalizedName,
+      p_whatsapp_number: normalizedWhatsapp,
+      p_grade: grade,
+      p_school_name: normalizedSchool,
+    });
 
-    let student: Student;
-    if (whatsappRow) {
-      const existing = whatsappRow as Student;
-      if (!sameIdentityText(existing.full_name, normalizedName)
-        || existing.grade !== grade
-        || !sameIdentityText(existing.school, normalizedSchool)) {
-        return { error: DUPLICATE_DETAILS_ERROR };
+    if (error) return { error: error.message };
+
+    const result = data as {
+      error?: string;
+      message?: string;
+      ok?: boolean;
+      submission_id?: string;
+      student_id?: string;
+      attempt_started_at?: string;
+      saved_answers?: Record<string, string>;
+    } | null;
+
+    if (!result || result.error) {
+      const code = result?.error;
+      if (code === 'already_submitted' || code === 'resume_not_allowed') {
+        return { error: result?.message || DUPLICATE_ATTEMPT_ERROR };
       }
-      student = existing;
-    } else {
-      const { data: insertedStudent, error: insertError } = await supabase
-        .from('students')
-        .insert({
-          full_name: normalizedName,
-          grade,
-          whatsapp_number: normalizedWhatsapp,
-          normalized_whatsapp: normalizedWhatsapp,
-          school: normalizedSchool,
-        })
-        .select('*')
-        .single();
-      if (insertError) {
-        if (isUniqueViolation(insertError)) return { error: DUPLICATE_DETAILS_ERROR };
-        return { error: insertError.message };
-      }
-      student = insertedStudent as Student;
+      return { error: result?.message || 'Unable to start the exam. Please try again.' };
     }
 
-    const { data: existingAttempt, error: attemptLookupError } = await supabase
-      .from('submissions')
-      .select('*')
-      .eq('student_id', student.id)
-      .eq('quiz_id', quiz.id)
-      .maybeSingle();
-    if (attemptLookupError) return { error: attemptLookupError.message };
-    if (existingAttempt) return { error: DUPLICATE_ATTEMPT_ERROR };
+    const now = new Date().toISOString();
+    const student: Student = {
+      id: result.student_id || '',
+      full_name: normalizedName,
+      school: normalizedSchool,
+      grade,
+      whatsapp_number: normalizedWhatsapp,
+      normalized_whatsapp: normalizedWhatsapp,
+      created_at: now,
+      updated_at: now,
+    };
 
-    const [deviceFingerprint, ipAddress] = await Promise.all([getDeviceId(), getClientIp()]);
-    const { data: submission, error: attemptInsertError } = await supabase
-      .from('submissions')
-      .insert({
-        student_id: student.id,
-        quiz_id: quiz.id,
-        student_name: normalizedName,
-        student_identifier: normalizedWhatsapp,
-        answers: {},
-        score: 0,
-        device_fingerprint: deviceFingerprint,
-        ip_address: ipAddress,
-        started_at: new Date().toISOString(),
-      })
-      .select('*')
-      .single();
-    if (attemptInsertError) {
-      return { error: isUniqueViolation(attemptInsertError) ? DUPLICATE_ATTEMPT_ERROR : attemptInsertError.message };
-    }
+    const submission: Submission = {
+      id: result.submission_id || '',
+      quiz_id: quiz.id,
+      student_name: normalizedName,
+      student_identifier: normalizedWhatsapp,
+      grade,
+      school_name: normalizedSchool,
+      whatsapp_number: normalizedWhatsapp,
+      answers: result.saved_answers || {},
+      score: 0,
+      rank: null,
+      started_at: result.attempt_started_at || now,
+      submitted_at: '',
+      time_taken_seconds: null,
+      attempt_started_at: result.attempt_started_at || now,
+      photo_url: '',
+      photo_uploaded_at: null,
+      created_at: now,
+      status: 'in_progress',
+      resume_allowed: false,
+      resume_granted_by: '',
+      resume_granted_at: null,
+      resume_reason: '',
+      last_activity_at: now,
+      normalized_name: normalizedName.toUpperCase(),
+      normalized_whatsapp: normalizedWhatsapp,
+      student_id: result.student_id || null,
+      time_extension_until: null,
+      time_extension_granted_by: '',
+      time_extension_granted_at: null,
+      time_extension_reason: '',
+      ip_address: null,
+      device_fingerprint: null,
+    };
 
-    return { student, submission: submission as Submission, quiz };
+    return { student, submission, quiz };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Unable to start the exam. Please try again.' };
   }
