@@ -34,6 +34,10 @@ export type Question = {
   option_c: string;
   option_d: string;
   correct_answer: 'A' | 'B' | 'C' | 'D';
+  group_id: string | null;
+  // Shared table/passage content for this question's group, if any.
+  // Only populated on reads that join question_groups (e.g. the exam RPC).
+  group_context?: string | null;
 };
 
 export type PublicQuestion = Omit<Question, 'correct_answer'>;
