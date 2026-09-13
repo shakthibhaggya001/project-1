@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase, type Quiz, type Question } from '@/lib/supabase';
 import { getQuizStatus, toLocalDateTimeInput } from '@/lib/utils';
+import { renderQuestionContent } from '@/lib/questionText';
 import {
   ArrowLeft,
   Plus,
@@ -850,7 +851,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
                   <span className="flex-shrink-0 w-10 h-10 bg-blue-100 text-blue-700 rounded-xl flex items-center justify-center text-lg font-bold">
                     {q.question_number}
                   </span>
-                  <p className="text-lg text-slate-900 font-medium pt-1.5">{q.question_text}</p>
+                  <p className="text-lg text-slate-900 font-medium pt-1.5">{renderQuestionContent(q.question_text)}</p>
                 </div>
                 <div className="grid grid-cols-1 gap-2.5">
                   {(['A', 'B', 'C', 'D'] as const).map((letter) => (
