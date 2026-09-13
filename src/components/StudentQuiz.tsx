@@ -59,7 +59,9 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
   const [questionsError, setQuestionsError] = useState<string | null>(null);
 
   const [studentName, setStudentName] = useState(initialStudentEntry?.fullName || '');
-  const [studentGrade, setStudentGrade] = useState<'10' | '11' | ''>('');
+  const [studentGrade, setStudentGrade] = useState<'10' | '11' | ''>(
+    initialStudentEntry?.grade ? (String(initialStudentEntry.grade) as '10' | '11') : ''
+  );
   const [schoolName, setSchoolName] = useState(initialStudentEntry?.school || '');
   const [whatsappNumber, setWhatsappNumber] = useState(initialStudentEntry?.whatsapp || '');
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -825,12 +827,33 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
     if (initialSubmission) {
       // Already registered via the /student-login screen — the auto-start
       // effect is resuming this attempt. Show a loader instead of a second
-      // copy of the registration form.
+      // copy of the registration form. If it failed, show the real error
+      // and a retry button instead of spinning forever.
       return (
         <main className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-          <div className="flex flex-col items-center gap-3 text-slate-500">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <p>Starting your exam…</p>
+          <div className="flex flex-col items-center gap-3 text-center max-w-md">
+            {joinError ? (
+              <>
+                <AlertCircle className="w-8 h-8 text-red-500" />
+                <p className="text-slate-700 font-medium">{joinError}</p>
+                <button
+                  onClick={() => {
+                    setJoinError(null);
+                    void handleStartNow();
+                  }}
+                  disabled={starting}
+                  className="mt-2 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Try again
+                </button>
+              </>
+            ) : (
+              <>
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                <p className="text-slate-500">Starting your exam…</p>
+              </>
+            )}
           </div>
         </main>
       );
