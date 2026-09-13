@@ -39,6 +39,60 @@ type Props = {
   onSaved: () => void;
 };
 
+// Renders a question group's shared context in the admin preview, mirroring
+// what students see: simple pipe-delimited markdown tables render as an
+// actual table, anything else renders as plain paragraphs.
+function PreviewGroupContext({ content }: { content: string }) {
+  const lines = content.split('\n').map((l) => l.trim()).filter(Boolean);
+  const tableLines = lines.filter((l) => l.startsWith('|'));
+  if (tableLines.length >= 2) {
+    const rows = tableLines
+      .filter((l) => !/^\|[\s\-:|]+\|$/.test(l))
+      .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
+    const header = rows[0] || [];
+    const body = rows.slice(1);
+    return (
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Reference</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr>
+                {header.map((cell, i) => (
+                  <th key={i} className="border border-slate-300 bg-slate-100 px-3 py-2 text-left font-semibold text-slate-700">
+                    {cell}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {body.map((row, ri) => (
+                <tr key={ri}>
+                  {row.map((cell, ci) => (
+                    <td key={ci} className="border border-slate-300 px-3 py-2 text-slate-700">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Reference</p>
+      <div className="space-y-2 text-slate-700 text-sm leading-relaxed">
+        {lines.map((line, i) => (
+          <p key={i}>{line}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const emptyQuestion = (num: number): QuestionDraft => ({
   question_number: num,
   question_text: '',
@@ -201,6 +255,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
   const [bulkImportText, setBulkImportText] = useState('');
   const [aiUploading, setAiUploading] = useState(false);
   const [answerKeyText, setAnswerKeyText] = useState('');
+  const [groupContexts, setGroupContexts] = useState<Record<string, string>>({});
 
   const autosaveTimers = useRef<{ [key: number]: ReturnType<typeof setTimeout> }>({});
 
@@ -219,6 +274,17 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         setError('Failed to load questions: ' + qErr.message);
         setQuestionsLoading(false);
         return;
+      }
+      const { data: groupsData } = await supabase
+        .from('question_groups')
+        .select('id, context_content')
+        .eq('quiz_id', quiz.id);
+      if (active && groupsData) {
+        const map: Record<string, string> = {};
+        for (const g of groupsData as { id: string; context_content: string }[]) {
+          map[g.id] = g.context_content;
+        }
+        setGroupContexts(map);
       }
       const loaded = (data as Question[]) || [];
       const drafts: QuestionDraft[] = loaded.map((q) => ({
@@ -493,6 +559,10 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
             return;
           }
           groupId = (data as { id: string })?.id || null;
+          if (groupId) {
+            const contextText = group.context.trim();
+            setGroupContexts((prev) => ({ ...prev, [groupId as string]: contextText }));
+          }
         }
         orderIndex += 1;
 
@@ -771,7 +841,11 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
           </div>
           <div className="space-y-4">
             {validQuestions.map((q, i) => (
-              <div key={i} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <div key={i} className="space-y-4">
+                {q.group_id && groupContexts[q.group_id] && (
+                  <PreviewGroupContext content={groupContexts[q.group_id]} />
+                )}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                 <div className="flex gap-3 mb-4">
                   <span className="flex-shrink-0 w-10 h-10 bg-blue-100 text-blue-700 rounded-xl flex items-center justify-center text-lg font-bold">
                     {q.question_number}
@@ -792,6 +866,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
                       </span>
                     </div>
                   ))}
+                </div>
                 </div>
               </div>
             ))}
