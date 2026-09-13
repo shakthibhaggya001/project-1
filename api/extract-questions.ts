@@ -39,7 +39,7 @@ export default async function handler(req: any, res: any) {
       'Only set correct_answer if the source document explicitly marks/underlines/bolds an answer key — otherwise use null. ' +
       'Extract every multiple-choice question from this exam paper as JSON per the schema above.';
 
-    const model = 'gemini-2.5-flash';
+    const model = 'gemini-3.6-flash';
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
