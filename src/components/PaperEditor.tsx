@@ -16,6 +16,7 @@ import {
   FileCheck,
   Upload,
   Sparkles,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 type QuestionDraft = {
@@ -28,6 +29,8 @@ type QuestionDraft = {
   option_d: string;
   correct_answer: 'A' | 'B' | 'C' | 'D';
   group_id?: string | null;
+  image_url?: string | null;
+  needsImageFlag?: boolean;
   dirty: boolean;
   saving?: boolean;
   saved?: boolean;
@@ -298,6 +301,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         option_d: q.option_d,
         correct_answer: q.correct_answer,
         group_id: q.group_id ?? null,
+        image_url: q.image_url ?? null,
         dirty: false,
         saved: true,
       }));
@@ -369,6 +373,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         option_d: q.option_d.trim(),
         correct_answer: q.correct_answer,
         group_id: q.group_id ?? null,
+        image_url: q.image_url ?? null,
       })
       .eq('id', q.id);
 
@@ -404,6 +409,42 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
       next.splice(idx + 1, 0, dup);
       return next;
     });
+  };
+
+  const [uploadingImageIdx, setUploadingImageIdx] = useState<number | null>(null);
+
+  const handleQuestionImageUpload = async (idx: number, file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file (PNG or JPG).');
+      return;
+    }
+    setUploadingImageIdx(idx);
+    setError(null);
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const path = `${quizId || 'draft'}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from('question-images')
+        .upload(path, file, { upsert: false });
+      if (uploadErr) {
+        setError(`Image upload failed: ${uploadErr.message}`);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from('question-images').getPublicUrl(path);
+      setQuestions((prev) => {
+        const next = [...prev];
+        next[idx] = { ...next[idx], image_url: urlData.publicUrl, needsImageFlag: false, dirty: true, saved: false };
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Image upload failed.');
+    } finally {
+      setUploadingImageIdx(null);
+    }
+  };
+
+  const removeQuestionImage = (idx: number) => {
+    updateQuestion(idx, 'image_url', '');
   };
 
   const handleDetailsNext = (e: React.FormEvent) => {
@@ -492,6 +533,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
       text: string;
       options: { A: string; B: string; C: string; D: string };
       correct_answer: 'A' | 'B' | 'C' | 'D' | null;
+      has_figure?: boolean;
     }>;
   };
 
@@ -578,6 +620,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
             option_d: q.options?.D || '',
             correct_answer: q.correct_answer || 'A',
             group_id: groupId,
+            needsImageFlag: !!q.has_figure,
             dirty: true,
             saved: false,
           });
@@ -589,8 +632,10 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         return;
       }
 
+      let flaggedNumbers: number[] = [];
       setQuestions((prev) => {
         const importedWithPositions = newDrafts.map((q, index) => ({ ...q, question_number: index + 1 }));
+        flaggedNumbers = importedWithPositions.filter((q) => q.needsImageFlag).map((q) => q.question_number);
         const merged = [...prev, ...importedWithPositions];
         const deduped = merged.filter((question, index, arr) => {
           if (!question.question_text.trim()) return false;
@@ -599,8 +644,12 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         return deduped.slice(0, TARGET_QUESTIONS);
       });
 
+      const imageNote =
+        flaggedNumbers.length > 0
+          ? ` ⚠️ Question(s) ${flaggedNumbers.join(', ')} appear to reference a map/photo/diagram in the original document — please upload that image manually for those questions (use the image button on each question card).`
+          : '';
       setStatusMsg(
-        `AI extracted ${newDrafts.length} question(s) from the PDF. Correct answers default to "A" unless the paper marked one — please review every answer with the Quick Answer Key Grid before publishing.`
+        `AI extracted ${newDrafts.length} question(s) from the PDF. Correct answers default to "A" unless the paper marked one — please review every answer with the Quick Answer Key Grid before publishing.${imageNote}`
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process the PDF.');
@@ -705,6 +754,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
                 option_d: q.option_d.trim(),
                 correct_answer: q.correct_answer,
                 group_id: q.group_id ?? null,
+                image_url: q.image_url ?? null,
               })
               .eq('id', q.id);
               if (uErr) saveErrors.push(`Question ${i + 1}: ${uErr.message}`);
@@ -723,6 +773,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
               option_d: q.option_d.trim(),
               correct_answer: q.correct_answer,
               group_id: q.group_id ?? null,
+              image_url: q.image_url ?? null,
             })
             .select()
             .single();
@@ -777,6 +828,7 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
         option_d: q.option_d.trim(),
         correct_answer: q.correct_answer,
         group_id: q.group_id ?? null,
+        image_url: q.image_url ?? null,
       })
       .select()
       .single();
@@ -853,6 +905,13 @@ export default function PaperEditor({ quiz, mode, onBack, onSaved }: Props) {
                   </span>
                   <p className="text-lg text-slate-900 font-medium pt-1.5">{renderQuestionContent(q.question_text)}</p>
                 </div>
+                {q.image_url && (
+                  <img
+                    src={q.image_url}
+                    alt={`Reference for question ${q.question_number}`}
+                    className="max-h-64 rounded-xl border border-slate-200 mb-4"
+                  />
+                )}
                 <div className="grid grid-cols-1 gap-2.5">
                   {(['A', 'B', 'C', 'D'] as const).map((letter) => (
                     <div
@@ -1255,8 +1314,34 @@ D. option`}
                     {q.saving && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
                     {q.saved && !q.dirty && !q.saving && <CheckCircle2 className="w-4 h-4 text-green-500" />}
                     {q.dirty && <span className="text-xs text-amber-600 font-medium">unsaved</span>}
+                    {q.needsImageFlag && !q.image_url && (
+                      <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 font-medium">
+                        ⚠️ may need an image
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
+                    <label
+                      title={q.image_url ? 'Replace image' : 'Attach a reference image (map, photo, diagram)'}
+                      className="p-1.5 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                    >
+                      {uploadingImageIdx === idx ? (
+                        <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                      ) : (
+                        <ImageIcon className={`w-4 h-4 ${q.image_url ? 'text-blue-500' : 'text-slate-400'}`} />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingImageIdx !== null}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void handleQuestionImageUpload(idx, file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
                     <button
                       onClick={() => duplicateQuestion(idx)}
                       title="Duplicate question"
@@ -1273,6 +1358,23 @@ D. option`}
                     </button>
                   </div>
                 </div>
+
+                {q.image_url && (
+                  <div className="mb-3 relative inline-block">
+                    <img
+                      src={q.image_url}
+                      alt={`Reference for question ${q.question_number}`}
+                      className="max-h-40 rounded-xl border border-slate-200"
+                    />
+                    <button
+                      onClick={() => removeQuestionImage(idx)}
+                      title="Remove image"
+                      className="absolute -top-2 -right-2 bg-white border border-slate-200 rounded-full p-1 shadow-sm hover:bg-red-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    </button>
+                  </div>
+                )}
 
                 <textarea
                   value={q.question_text}
