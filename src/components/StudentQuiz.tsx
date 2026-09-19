@@ -167,7 +167,7 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
     // Never select correct_answer on this public fallback.
     const fallback = await supabase
       .from('questions')
-      .select('id, quiz_id, question_number, question_text, option_a, option_b, option_c, option_d, group_id')
+      .select('id, quiz_id, question_number, question_text, option_a, option_b, option_c, option_d, group_id, image_url')
       .eq('quiz_id', quizId)
       .order('question_number', { ascending: true });
     return {
@@ -778,6 +778,13 @@ export default function StudentQuiz({ onBack, initialQuiz = null, initialSubmiss
                   </span>
                   <p className="text-lg text-slate-900 font-medium pt-1.5">{renderQuestionContent(currentQ.question_text)}</p>
                 </div>
+                {currentQ.image_url && (
+                  <img
+                    src={currentQ.image_url}
+                    alt={`Reference for question ${currentQuestionIndex + 1}`}
+                    className="max-h-64 rounded-xl border border-slate-200 mb-5"
+                  />
+                )}
                 <div className="grid grid-cols-1 gap-2.5">
                   {(['A', 'B', 'C', 'D'] as const).map((letter) => {
                     const optionText = currentQ[`option_${letter.toLowerCase()}` as keyof PublicQuestion] as string;
