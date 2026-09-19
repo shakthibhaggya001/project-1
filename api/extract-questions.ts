@@ -34,9 +34,10 @@ export default async function handler(req: any, res: any) {
       'Some individual questions (e.g. matching-pairs questions like "match column A to column B") contain their OWN table within that single question\'s text — keep that table inside that question\'s "text" field, not as a group context. ' +
       'Whenever you render any table (shared context or embedded in a single question), use real newline characters ("\\n") between rows — never join rows on one line with "||". ' +
       'Render tables using simple pipe-delimited markdown, e.g. "| Year | Event |\\n| 1948 | Independence |". ' +
+      'You cannot extract actual image/photo pixel data — if a question refers to, or is placed directly next to, a map, photo, diagram, illustration, or figure (in Sinhala often "රූප සටහන", "සිතියම", "පින්තූරය"), set "has_figure": true for that question so the admin knows to attach that image manually. Otherwise set it false. ' +
       'Respond with ONLY valid JSON, no prose, no markdown code fences, matching exactly this shape: ' +
       '{"groups":[{"context": string|null, "questions":[{"number": number, "text": string, ' +
-      '"options": {"A": string, "B": string, "C": string, "D": string}, "correct_answer": "A"|"B"|"C"|"D"|null}]}]}. ' +
+      '"options": {"A": string, "B": string, "C": string, "D": string}, "correct_answer": "A"|"B"|"C"|"D"|null, "has_figure": boolean}]}]}. ' +
       'Questions with no shared table go in their own group with "context": null. ' +
       'Only set correct_answer if the source document explicitly marks/underlines/bolds an answer key — otherwise use null. ' +
       'Extract every multiple-choice question from this exam paper as JSON per the schema above.';
