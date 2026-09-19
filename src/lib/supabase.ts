@@ -38,6 +38,9 @@ export type Question = {
   // Shared table/passage content for this question's group, if any.
   // Only populated on reads that join question_groups (e.g. the exam RPC).
   group_context?: string | null;
+  // Reference image/diagram for this specific question, if the admin
+  // attached one (e.g. a map or photo the question refers to).
+  image_url?: string | null;
 };
 
 export type PublicQuestion = Omit<Question, 'correct_answer'>;
