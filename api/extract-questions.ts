@@ -42,32 +42,54 @@ export default async function handler(req: any, res: any) {
       'Extract every multiple-choice question from this exam paper as JSON per the schema above.';
 
     const model = 'gemini-3.6-flash';
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const body = JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: 'application/pdf', data: fileBase64 } },
+          ],
+        },
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+    });
+
+    // Gemini's free tier occasionally returns a transient 503
+    // ("currently experiencing high demand ... usually temporary").
+    // Retry a few times with backoff before giving up, so a passing
+    // traffic spike doesn't force the admin to manually click Upload again.
+    let geminiRes: Response | null = null;
+    let lastDetails = '';
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { text: prompt },
-                { inline_data: { mime_type: 'application/pdf', data: fileBase64 } },
-              ],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-          },
-        }),
+        body,
+      });
+      if (res.ok) {
+        geminiRes = res;
+        break;
       }
-    );
+      lastDetails = await res.text();
+      const isRetryable = res.status === 503 || res.status === 429;
+      console.error(`Gemini API attempt ${attempt} failed`, res.status, lastDetails);
+      if (!isRetryable || attempt === maxAttempts) {
+        geminiRes = res;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, attempt * 2000));
+    }
 
-    if (!geminiRes.ok) {
-      const details = await geminiRes.text();
-      console.error('Gemini API request failed', geminiRes.status, details);
-      res.status(502).json({ error: 'AI extraction request failed.', details });
+    if (!geminiRes || !geminiRes.ok) {
+      res.status(502).json({
+        error: 'AI extraction request failed after retrying — the model may still be overloaded. Please wait a minute and try again.',
+        details: lastDetails,
+      });
       return;
     }
 
